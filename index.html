@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ROT MACHINE</title>
+<style>
+  @font-face {
+    font-family: 'sys';
+  }
+  :root{
+    --void: #0a0014;
+    --hotpink: #ff2ec4;
+    --toxic: #c6ff00;
+    --electric: #00e5ff;
+    --warn: #ff4d1c;
+    --paper: #f4f0ff;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;padding:0;
+    background:var(--void);
+    color:var(--paper);
+    font-family: 'Arial Black', Impact, 'Segoe UI', sans-serif;
+    min-height:100vh;
+    overflow-x:hidden;
+  }
+  body{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:18px 14px 40px;
+  }
+  .wrap{
+    width:100%;
+    max-width:460px;
+  }
+  h1{
+    font-size:clamp(28px,9vw,42px);
+    margin:4px 0 2px;
+    line-height:0.95;
+    letter-spacing:-1px;
+    background:linear-gradient(90deg,var(--hotpink),var(--electric) 50%,var(--toxic));
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+    transform:skewX(-4deg);
+    text-shadow:none;
+  }
+  .sub{
+    font-family:'Segoe UI',sans-serif;
+    font-weight:400;
+    font-size:13.5px;
+    color:#b9aed6;
+    margin:0 0 18px;
+    max-width:38ch;
+  }
+  .panel{
+    background:#150524;
+    border:2px solid #33124f;
+    border-radius:14px;
+    padding:14px;
+    margin-bottom:14px;
+  }
+  textarea{
+    width:100%;
+    background:#0e0320;
+    border:2px solid #3a1a5c;
+    border-radius:10px;
+    color:var(--paper);
+    font-family:'Segoe UI',sans-serif;
+    font-size:16px;
+    padding:12px;
+    resize:none;
+    height:64px;
+    outline:none;
+    transition:border-color .15s;
+  }
+  textarea:focus{border-color:var(--electric);}
+  .meter-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-top:6px;
+    font-family:'Segoe UI',sans-serif;
+    font-size:12px;
+    color:#8a7ba8;
+  }
+  .meter-row span.over{color:var(--warn);font-weight:700;}
+  .btn-row{
+    display:flex;
+    gap:10px;
+    margin-top:12px;
+  }
+  button{
+    font-family:'Arial Black',Impact,sans-serif;
+    border:none;
+    border-radius:10px;
+    padding:14px 10px;
+    font-size:14.5px;
+    cursor:pointer;
+    flex:1;
+    letter-spacing:0.3px;
+    transition:transform .08s ease;
+    color:var(--void);
+  }
+  button:active{transform:scale(0.96);}
+  button:disabled{opacity:0.45;cursor:not-allowed;transform:none;}
+  #genBtn{
+    background:linear-gradient(90deg,var(--electric),#7cf7ff);
+  }
+  #rotBtn{
+    background:linear-gradient(90deg,var(--toxic),#e8ff8a);
+    flex:1.15;
+  }
+  #status{
+    font-family:'Segoe UI',sans-serif;
+    font-size:13px;
+    color:var(--toxic);
+    min-height:18px;
+    margin-top:10px;
+    text-align:center;
+  }
+
+  /* ---- stage ---- */
+  #stageBox{display:none;}
+  #stageBox.show{display:block;}
+  .stage{
+    position:relative;
+    width:100%;
+    aspect-ratio:9/16;
+    border-radius:16px;
+    overflow:hidden;
+    background:#000;
+    border:2px solid #3a1a5c;
+    box-shadow:0 0 0 4px #0a0014, 0 8px 30px rgba(255,46,196,0.15);
+  }
+  #bgCanvas, #fxCanvas{
+    position:absolute;top:0;left:0;width:100%;height:100%;
+  }
+  .overlayBurst{
+    position:absolute;
+    font-family:'Arial Black',Impact,sans-serif;
+    font-weight:900;
+    color:var(--toxic);
+    -webkit-text-stroke:2px #000;
+    paint-order:stroke fill;
+    font-size:26px;
+    opacity:0;
+    pointer-events:none;
+    white-space:nowrap;
+    text-shadow:3px 3px 0 #000;
+  }
+  #capWrap{
+    position:absolute;
+    left:0;right:0;
+    bottom:9%;
+    display:flex;
+    justify-content:center;
+    padding:0 8%;
+    pointer-events:none;
+  }
+  #caption{
+    font-family:'Arial Black',Impact,sans-serif;
+    font-size:clamp(18px,5.6vw,25px);
+    text-align:center;
+    color:#fff;
+    -webkit-text-stroke:1.6px #000;
+    paint-order:stroke fill;
+    line-height:1.15;
+    text-shadow:2px 2px 0 #000, -2px -2px 0 #000;
+  }
+  #caption .active{ color: var(--toxic); }
+  #topTag{
+    position:absolute;top:4%;left:0;right:0;
+    text-align:center;
+    font-family:'Segoe UI',sans-serif;
+    font-size:11px;
+    letter-spacing:2px;
+    color:rgba(255,255,255,0.55);
+  }
+  #playhead{
+    position:absolute;bottom:0;left:0;height:4px;
+    background:linear-gradient(90deg,var(--hotpink),var(--electric));
+    width:0%;
+  }
+  #controls{
+    display:flex;gap:10px;margin-top:12px;
+  }
+  #controls button{background:#241238;color:var(--paper);border:1.5px solid #3a1a5c;}
+  #controls button:disabled{opacity:0.35;}
+  footer{
+    font-family:'Segoe UI',sans-serif;
+    font-size:11px;
+    color:#5f5480;
+    text-align:center;
+    margin-top:16px;
+    line-height:1.5;
+  }
+  @keyframes shake{
+    0%,100%{transform:translate(0,0) rotate(0deg);}
+    25%{transform:translate(-1px,1px) rotate(-0.4deg);}
+    50%{transform:translate(1px,-1px) rotate(0.4deg);}
+    75%{transform:translate(-1px,-1px) rotate(0deg);}
+  }
+  .shaking{animation:shake 0.15s infinite;}
+  @media (prefers-reduced-motion: reduce){
+    .shaking{animation:none;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>ROT MACHINE</h1>
+  <p class="sub">Type a prompt, get a full-chaos 60-second brainrot short — narrated, subtitled, unhinged.</p>
+
+  <div class="panel">
+    <textarea id="promptInput" maxlength="140" placeholder="e.g. ohio skibidi at the DMV"></textarea>
+    <div class="meter-row">
+      <span id="wordCount">0 / 9 words</span>
+      <span id="hint"></span>
+    </div>
+    <div class="btn-row">
+      <button id="genBtn">GENERATE</button>
+      <button id="rotBtn">🎲 QUICK ROT</button>
+    </div>
+    <div id="status"></div>
+  </div>
+
+  <div id="stageBox">
+    <div class="stage" id="stage">
+      <canvas id="bgCanvas"></canvas>
+      <canvas id="fxCanvas"></canvas>
+      <div id="topTag">NOW ROTTING</div>
+      <div id="capWrap"><div id="caption"></div></div>
+      <div id="playhead"></div>
+    </div>
+    <div id="controls">
+      <button id="playBtn" disabled>▶ PLAY</button>
+      <button id="replayBtn" disabled>↻ REPLAY</button>
+      <button id="stopBtn" disabled>■ STOP</button>
+    </div>
+  </div>
+
+  <footer>Live in-browser rot render — each line drives its own emoji/color/callout, captions synced word-by-word, narrated if your browser supports speech. Not a downloadable .mp4, pure real-time chaos energy.</footer>
+</div>
+
+<script>
+const promptInput = document.getElementById('promptInput');
+const wordCountEl = document.getElementById('wordCount');
+const hintEl = document.getElementById('hint');
+const genBtn = document.getElementById('genBtn');
+const rotBtn = document.getElementById('rotBtn');
+const statusEl = document.getElementById('status');
+const stageBox = document.getElementById('stageBox');
+const stage = document.getElementById('stage');
+const bgCanvas = document.getElementById('bgCanvas');
+const fxCanvas = document.getElementById('fxCanvas');
+const captionEl = document.getElementById('caption');
+const playhead = document.getElementById('playhead');
+const playBtn = document.getElementById('playBtn');
+const replayBtn = document.getElementById('replayBtn');
+const stopBtn = document.getElementById('stopBtn');
+
+let currentScript = null; // { segments:[{text,emoji,color,burst}], narration, wordList }
+let utter = null;
+let animId = null;
+let startTime = null;
+let estDuration = 60;
+let wordTimings = []; // {word, startFrac}
+let overlayTimer = null;
+
+/* ---------- word counter ---------- */
+function countWords(s){ return s.trim().length ? s.trim().split(/\s+/).length : 0; }
+promptInput.addEventListener('input', ()=>{
+  const n = countWords(promptInput.value);
+  wordCountEl.textContent = `${n} / 9 words`;
+  wordCountEl.className = n > 9 ? 'over' : '';
+  genBtn.disabled = n === 0 || n > 9;
+});
+
+/* ---------- quick rot prompt builder ---------- */
+const ROT_SUBJECTS = ["skibidi toilet","ohio sigma","gyat rizzler","backrooms goblin","italian brainrot shark","ratio bot","fanum tax raccoon","sussy imposter","mewing frog","aura farmer","delulu princess","67 shrimp job"];
+const ROT_SETTINGS = ["at the DMV","in the backrooms","during math class","at 3am","on the moon","at a wedding","in prison","at church","on a submarine","in the sewers"];
+const ROT_TWIST = ["and it goes wrong","for maximum rizz","with zero aura","and gets ratio'd","and finds the skibidi","and loses all sigma","and becomes gyat"];
+function randomRotPrompt(){
+  const subj = ROT_SUBJECTS[Math.floor(Math.random()*ROT_SUBJECTS.length)];
+  const set = ROT_SETTINGS[Math.floor(Math.random()*ROT_SETTINGS.length)];
+  const twist = Math.random() < 0.6 ? ' ' + ROT_TWIST[Math.floor(Math.random()*ROT_TWIST.length)] : '';
+  let p = `${subj} ${set}${twist}`;
+  // enforce <10 words
+  let parts = p.split(/\s+/);
+  if(parts.length > 9) parts = parts.slice(0,9);
+  return parts.join(' ');
+}
+
+rotBtn.addEventListener('click', ()=>{
+  const p = randomRotPrompt();
+  promptInput.value = p;
+  promptInput.dispatchEvent(new Event('input'));
+  generate(p);
+});
+genBtn.addEventListener('click', ()=>{
+  const p = promptInput.value.trim();
+  if(!p) return;
+  generate(p);
+});
+
+/* ---------- local fallback generator (used if API fails) ---------- */
+const FALLBACK_EMOJI = "💀";
+function buildFallbackSegments(prompt){
+  const palette = ['#ff2ec4','#00e5ff','#c6ff00','#ff4d1c','#7c4dff','#ff9100'];
+  const rows = [
+    { text:`Yo yo yo, listen up, because ${prompt} is about to reach maximum sigma levels of unhinged.`, emoji:'🚨', burst:'SIGMA ALERT' },
+    { text:`We are talking zero aura, full ohio energy, no cap, straight up gyat behavior.`, emoji:'🤡', burst:'ZERO AURA' },
+    { text:`The rizz is unmatched, the skibidi is strong, and honestly the fanum tax has been collected in full.`, emoji:'🚽', burst:'FANUM TAX' },
+    { text:`Somewhere a shrimp is doing a job, a toilet is singing, and the backrooms are vibrating with pure sigma.`, emoji:'🦐', burst:'67' },
+    { text:`This is not a phase, this is the final form of ${prompt}, delulu and proud, mewing through every second.`, emoji:'👽', burst:'DELULU' },
+    { text:`And that, my friends, is the true final boss of brainrot, sixty seconds of pure unfiltered ohio rizz.`, emoji:'💀', burst:'GOATED' }
+  ];
+  return rows.map((r,i)=>({ ...r, color: palette[i % palette.length] }));
+}
+
+/* ---------- generate via Anthropic API ---------- */
+async function generate(promptText){
+  genBtn.disabled = true; rotBtn.disabled = true;
+  stopPlayback();
+  stageBox.classList.remove('show');
+  const rotStatuses = ["Fermenting the rot...","Summoning ohio energy...","Collecting fanum tax...","Calibrating sigma levels...","Cooking maximum brainrot..."];
+  statusEl.textContent = rotStatuses[Math.floor(Math.random()*rotStatuses.length)];
+
+  let data = null;
+  try{
+    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 1200,
+        messages: [{
+          role: "user",
+          content: `You write scripts for chaotic "brainrot" meme TikTok-style videos (Gen Alpha slang, absurdist, high energy, skibidi/ohio/rizz/gyat/sigma register).
+Topic prompt: "${promptText}"
+
+Break the story into 7 to 10 short spoken beats/segments that together form one continuous 140-170 word narration about the topic. EVERY segment's emoji, color, and burst must visually match what that specific segment's text is describing — no generic filler, the visuals must track the story line by line.
+
+Return ONLY a raw JSON object, no markdown fences, no preamble, matching exactly this shape:
+{
+  "segments": [
+    {
+      "text": "5 to 9 word spoken phrase, natural spoken language, no stage directions, no emojis, no asterisks",
+      "emoji": "one single emoji that visually represents exactly what THIS phrase describes",
+      "color": "a hex color (e.g. #ff2ec4) matching the mood/subject of THIS phrase",
+      "burst": "a 1-3 word ALL CAPS slang callout tied to THIS phrase's specific content"
+    }
+  ]
+}`
+        }]
+      })
+    });
+    const json = await resp.json();
+    const textBlock = (json.content || []).find(b => b.type === "text");
+    let raw = textBlock ? textBlock.text : "";
+    raw = raw.replace(/```json|```/g, "").trim();
+    data = JSON.parse(raw);
+    if(!Array.isArray(data.segments) || !data.segments.length) throw new Error("bad shape");
+    data.segments.forEach(s=>{ if(!s.text) throw new Error("bad segment"); });
+  }catch(e){
+    data = { segments: buildFallbackSegments(promptText) };
+  }
+
+  currentScript = data;
+  buildCaptionChunks(data.segments);
+  statusEl.textContent = "Rot generated. Hit play.";
+  stageBox.classList.add('show');
+  setupCanvases();
+  drawIdleFrame();
+  playBtn.disabled = false;
+  replayBtn.disabled = true;
+  stopBtn.disabled = true;
+  genBtn.disabled = false; rotBtn.disabled = false;
+}
+
+/* ---------- caption chunking (one chunk per story segment) ---------- */
+let captionChunks = []; // [{ words:[..], startWordIdx, emoji, color, burst }]
+function buildCaptionChunks(segments){
+  captionChunks = [];
+  let idx = 0;
+  segments.forEach(seg=>{
+    const words = seg.text.trim().split(/\s+/);
+    captionChunks.push({
+      words,
+      startWordIdx: idx,
+      emoji: seg.emoji || FALLBACK_EMOJI,
+      color: seg.color || '#ff2ec4',
+      burst: seg.burst || (seg.emoji || '')
+    });
+    idx += words.length;
+  });
+  currentScript.wordList = captionChunks.flatMap(c => c.words);
+  currentScript.narration = currentScript.wordList.join(' ');
+}
+
+/* ---------- canvas visual chaos, synced to the active story segment ---------- */
+let bgCtx, fxCtx, W, H;
+let particles = [];
+let currentEmoji = FALLBACK_EMOJI;
+let currentColorHex = '#ff2ec4';
+let flashUntil = 0;
+let lastChunkRef = null;
+
+function setupCanvases(){
+  const rect = stage.getBoundingClientRect();
+  [bgCanvas, fxCanvas].forEach(c=>{
+    c.width = rect.width * 2;
+    c.height = rect.height * 2;
+  });
+  W = bgCanvas.width; H = bgCanvas.height;
+  bgCtx = bgCanvas.getContext('2d');
+  fxCtx = fxCanvas.getContext('2d');
+  lastChunkRef = null;
+  currentEmoji = (captionChunks[0] && captionChunks[0].emoji) || FALLBACK_EMOJI;
+  currentColorHex = (captionChunks[0] && captionChunks[0].color) || '#ff2ec4';
+  particles = [];
+  for(let i=0;i<22;i++){
+    particles.push({
+      x: Math.random()*W,
+      y: Math.random()*H - H,
+      speed: 2 + Math.random()*6,
+      size: 24 + Math.random()*36,
+      rot: Math.random()*Math.PI*2,
+      spin: (Math.random()-0.5)*0.1,
+      char: currentEmoji
+    });
+  }
+}
+function drawIdleFrame(){
+  bgCtx.fillStyle = '#0a0014';
+  bgCtx.fillRect(0,0,W,H);
+  fxCtx.clearRect(0,0,W,H);
+}
+function hexToRgb(hex){
+  const h = (hex || '#ff2ec4').replace('#','');
+  const full = h.length === 3 ? h.split('').map(c=>c+c).join('') : h;
+  const n = parseInt(full, 16) || 0xff2ec4;
+  return [(n>>16)&255, (n>>8)&255, n&255];
+}
+let hueDrift = 0;
+function drawBackground(){
+  hueDrift += 1.6;
+  const [r,g,b] = hexToRgb(currentColorHex);
+  const grad = bgCtx.createRadialGradient(W/2,H*0.4,0, W/2,H*0.4,W*0.95);
+  grad.addColorStop(0, `rgba(${r},${g},${b},0.55)`);
+  grad.addColorStop(1, '#05000c');
+  bgCtx.fillStyle = grad;
+  bgCtx.fillRect(0,0,W,H);
+  bgCtx.fillStyle = `hsla(${hueDrift%360},80%,50%,0.05)`;
+  bgCtx.fillRect(0,0,W,H);
+  if(Math.random() < 0.12){
+    bgCtx.fillStyle = 'rgba(255,255,255,0.04)';
+    bgCtx.fillRect(0, Math.random()*H, W, 4 + Math.random()*10);
+  }
+  if(performance.now() < flashUntil){
+    bgCtx.fillStyle = 'rgba(255,255,255,0.32)';
+    bgCtx.fillRect(0,0,W,H);
+  }
+}
+function drawParticles(){
+  fxCtx.clearRect(0,0,W,H);
+  fxCtx.textAlign = 'center';
+  fxCtx.textBaseline = 'middle';
+  particles.forEach(p=>{
+    p.y += p.speed;
+    p.rot += p.spin;
+    if(p.y > H + 60){ p.y = -60; p.x = Math.random()*W; }
+    fxCtx.save();
+    fxCtx.translate(p.x, p.y);
+    fxCtx.rotate(p.rot);
+    fxCtx.font = `${p.size}px sans-serif`;
+    fxCtx.fillText(p.char, 0, 0);
+    fxCtx.restore();
+  });
+}
+function renderLoop(){
+  drawBackground();
+  drawParticles();
+  if(startTime){
+    const elapsed = (performance.now() - startTime) / 1000;
+    const frac = Math.min(elapsed / estDuration, 1);
+    playhead.style.width = (frac*100) + '%';
+  }
+  animId = requestAnimationFrame(renderLoop);
+}
+
+/* Called whenever playback crosses into a new story segment: swap the
+   particle emoji + background color to match, flash a cut, and burst
+   that segment's slang callout — all driven by the actual script content. */
+function onSceneChange(chunk){
+  currentEmoji = chunk.emoji || currentEmoji;
+  currentColorHex = chunk.color || currentColorHex;
+  particles.forEach(p => p.char = currentEmoji);
+  flashUntil = performance.now() + 120;
+  spawnBurstText(chunk.burst || currentEmoji);
+}
+
+/* ---------- slang burst tied to the current segment ---------- */
+function spawnBurstText(text){
+  if(!text) return;
+  const el = document.createElement('div');
+  el.className = 'overlayBurst';
+  el.textContent = text;
+  const colors = ['#c6ff00','#ff2ec4','#00e5ff','#ff4d1c'];
+  el.style.color = colors[Math.floor(Math.random()*colors.length)];
+  el.style.left = (10 + Math.random()*55) + '%';
+  el.style.top = (12 + Math.random()*55) + '%';
+  el.style.fontSize = (20 + Math.random()*16) + 'px';
+  el.style.transform = `rotate(${(Math.random()*30-15)}deg)`;
+  stage.appendChild(el);
+  el.animate([
+    { opacity:0, transform: el.style.transform + ' scale(0.5)' },
+    { opacity:1, transform: el.style.transform + ' scale(1.15)', offset:0.25 },
+    { opacity:1, transform: el.style.transform + ' scale(1)', offset:0.7 },
+    { opacity:0, transform: el.style.transform + ' scale(0.9)' }
+  ], { duration: 900, easing:'ease-out' }).onfinish = ()=> el.remove();
+}
+
+/* ---------- speech + subtitle sync ---------- */
+const SPEECH_OK = (typeof window !== 'undefined') && ('speechSynthesis' in window) && (typeof SpeechSynthesisUtterance !== 'undefined');
+let captionTimerIds = [];
+
+function estimateRate(wordCount){
+  // baseline ~160 wpm at rate 1.0 -> aim for ~60s total
+  const rate = wordCount / 160;
+  return Math.max(0.85, Math.min(1.8, rate));
+}
+function pickVoice(){
+  if(!SPEECH_OK) return null;
+  const voices = speechSynthesis.getVoices();
+  if(!voices.length) return null;
+  return voices.find(v=>/male|david|mark|guy/i.test(v.name)) || voices[0];
+}
+
+function playScript(){
+  if(!currentScript) return;
+  stopPlayback();
+  playBtn.disabled = true; replayBtn.disabled = true; stopBtn.disabled = false;
+  const words = currentScript.wordList;
+  const rate = estimateRate(words.length);
+  estDuration = Math.max(20, words.length / (rate*160/60));
+
+  if(!SPEECH_OK){
+    playScriptWithoutVoice(words);
+    return;
+  }
+
+  utter = new SpeechSynthesisUtterance(currentScript.narration);
+  utter.rate = rate;
+  utter.pitch = 1.25;
+  const v = pickVoice();
+  if(v) utter.voice = v;
+
+  let currentWordIdx = -1;
+  utter.onboundary = (e)=>{
+    if(e.name !== 'word') return;
+    // find which word this char index falls into
+    const upto = currentScript.narration.slice(0, e.charIndex);
+    const idx = upto.trim().length ? upto.trim().split(/\s+/).length : 0;
+    currentWordIdx = idx;
+    renderCaption(currentWordIdx);
+  };
+  utter.onstart = ()=>{
+    startTime = performance.now();
+    animId = requestAnimationFrame(renderLoop);
+    stage.classList.add('shaking');
+  };
+  utter.onend = finishPlayback;
+  utter.onerror = finishPlayback;
+
+  try{
+    speechSynthesis.cancel();
+    speechSynthesis.speak(utter);
+  }catch(err){
+    playScriptWithoutVoice(words);
+  }
+}
+
+/* Fallback path for browsers/sandboxes with no speech synthesis:
+   advance captions on a timer sized to hit ~estDuration, no audio. */
+function playScriptWithoutVoice(words){
+  statusEl.textContent = "No voice engine here — playing timed captions instead.";
+  startTime = performance.now();
+  animId = requestAnimationFrame(renderLoop);
+  stage.classList.add('shaking');
+
+  const msPerWord = (estDuration * 1000) / words.length;
+  captionTimerIds = [];
+  words.forEach((_, idx)=>{
+    const id = setTimeout(()=
