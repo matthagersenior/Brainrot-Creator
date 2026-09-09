@@ -15,14 +15,22 @@ function imageRequest(body = {}) {
   });
 }
 
-test('visualize endpoint uses Cloudflare FLUX and returns a data URI', async () => {
+async function captureMultipart(requestedInput) {
+  assert.ok(requestedInput?.multipart?.body, 'FLUX.2 request must use multipart body');
+  assert.match(requestedInput.multipart.contentType || '', /^multipart\/form-data;/);
+  return new Response(requestedInput.multipart.body, {
+    headers: { 'content-type': requestedInput.multipart.contentType },
+  }).formData();
+}
+
+test('visualize endpoint uses FLUX.2 Klein with true vertical dimensions', async () => {
   let model = '';
-  let input = null;
+  let form = null;
   const env = {
     AI: {
       async run(requestedModel, requestedInput) {
         model = requestedModel;
-        input = requestedInput;
+        form = await captureMultipart(requestedInput);
         return { image: 'ZmFrZS1qcGVnLWJ5dGVz' };
       },
     },
@@ -32,13 +40,37 @@ test('visualize endpoint uses Cloudflare FLUX and returns a data URI', async () 
   const body = await response.json();
 
   assert.equal(response.status, 200);
-  assert.equal(model, '@cf/black-forest-labs/flux-1-schnell');
-  assert.equal(Object.hasOwn(input, 'seed'), false, 'FLUX input must not include unsupported seed');
-  assert.equal(body.seed, 42, 'seed may remain response metadata for client bookkeeping');
-  assert.match(input.prompt, /realistic/i);
-  assert.match(input.prompt, /vertical/i);
+  assert.equal(model, '@cf/black-forest-labs/flux-2-klein-4b');
+  assert.equal(form.get('width'), '576');
+  assert.equal(form.get('height'), '1024');
+  assert.match(String(form.get('prompt')), /realistic/i);
+  assert.match(String(form.get('prompt')), /vertical/i);
   assert.match(body.dataURI, /^data:image\/jpeg;base64,/);
-  assert.equal(body.source, 'cloudflare-flux-1-schnell');
+  assert.equal(body.source, 'cloudflare-flux-2-klein-4b');
+});
+
+test('visualize endpoint sends an optional scene-one reference image for identity continuity', async () => {
+  let form = null;
+  const env = {
+    AI: {
+      async run(_model, requestedInput) {
+        form = await captureMultipart(requestedInput);
+        return { image: 'ZmFrZS1yZWZlcmVuY2UtaW1hZ2U=' };
+      },
+    },
+  };
+
+  const referenceDataURI = 'data:image/jpeg;base64,ZmFrZS1zbWFsbC1yZWZlcmVuY2U=';
+  const response = await onRequestPost({
+    request: imageRequest({ referenceDataURI }),
+    env,
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.ok(form.get('input_image_0'), 'reference image must be included in multipart input');
+  assert.match(String(form.get('prompt')), /reference/i);
+  assert.equal(body.referenceUsed, true);
 });
 
 test('visualize endpoint fails safely when Workers AI binding is unavailable', async () => {
