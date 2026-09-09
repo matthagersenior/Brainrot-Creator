@@ -141,9 +141,22 @@ jobs:
           set -euo pipefail
           base="https://${CLOUDFLARE_PAGES_PROJECT}.pages.dev"
 
-          curl --fail --silent --show-error --retry 12 --retry-delay 2 --retry-all-errors "$base/" > "$RUNNER_TEMP/page.html"
-          grep -q 'ROT MACHINE' "$RUNNER_TEMP/page.html"
-          grep -q 'visualStyleSelect' "$RUNNER_TEMP/page.html"
+          echo "Waiting for Cloudflare production alias to serve this build..."
+          alias_ready=false
+          for attempt in {1..30}; do
+            if curl --fail --silent --show-error "$base/" > "$RUNNER_TEMP/page.html" \
+              && grep -q 'ROT MACHINE' "$RUNNER_TEMP/page.html" \
+              && grep -q 'visualStyleSelect' "$RUNNER_TEMP/page.html"; then
+              alias_ready=true
+              echo "Cloudflare production alias is current on attempt $attempt."
+              break
+            fi
+            sleep 2
+          done
+          if [[ "$alias_ready" != "true" ]]; then
+            echo "Cloudflare production alias did not serve the new build marker after 30 attempts."
+            exit 1
+          fi
           echo "Live page passed."
 
           curl --fail --silent --show-error --retry 6 --retry-delay 2 --retry-all-errors \
