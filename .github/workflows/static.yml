@@ -121,3 +121,31 @@ jobs:
             --project-name="$CLOUDFLARE_PAGES_PROJECT" \
             --branch=main \
             --commit-hash="$GITHUB_SHA"
+
+      - name: Smoke test Cloudflare production
+        if: steps.cloudflare.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://${CLOUDFLARE_PAGES_PROJECT}.pages.dev"
+
+          curl --fail --silent --show-error --retry 12 --retry-delay 2 --retry-all-errors "$base/" > "$RUNNER_TEMP/page.html"
+          grep -q 'ROT MACHINE' "$RUNNER_TEMP/page.html"
+
+          curl --fail --silent --show-error --retry 6 --retry-delay 2 --retry-all-errors \
+            "$base/api/trends" > "$RUNNER_TEMP/trends.json"
+          jq -e '.source and (.trends | type == "array")' "$RUNNER_TEMP/trends.json" >/dev/null
+
+          curl --fail --silent --show-error --retry 3 --retry-delay 2 --retry-all-errors \
+            -X POST "$base/api/story" \
+            -H 'content-type: application/json' \
+            --data '{"prompt":"frog at the DMV"}' > "$RUNNER_TEMP/story.json"
+          jq -e '(.source | startswith("gemini-")) and (.scenes | length == 8)' "$RUNNER_TEMP/story.json" >/dev/null
+
+          curl --fail --silent --show-error --retry 3 --retry-delay 2 --retry-all-errors \
+            -X POST "$base/api/narrate" \
+            -H 'content-type: application/json' \
+            --data '{"text":"Testing the Brainrot narrator."}' > "$RUNNER_TEMP/narrate.json"
+          jq -e '(.source | startswith("gemini-")) and (.sampleRate == 24000) and (.pcmBase64 | length > 1000)' "$RUNNER_TEMP/narrate.json" >/dev/null
+
+          echo "Cloudflare production smoke test passed: page, trends, Gemini story, and Gemini narration."
