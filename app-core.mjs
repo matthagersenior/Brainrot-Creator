@@ -2,8 +2,7 @@ export const MAX_PROMPT_WORDS = 9;
 export const TARGET_SECONDS = 60;
 export const SCENE_COUNT = 8;
 
-const PALETTE = ['#ff2ec4', '#00e5ff', '#c6ff00', '#ff4d1c', '#8c52ff', '#ff9f1c', '#24f28b', '#ff5e8a'];
-const EMOJIS = ['💀', '🧠', '🚽', '🌀', '🐸', '🦈', '👽', '🦐'];
+const PALETTE = ['#d4845f', '#6688a8', '#9a7c63', '#5f7c6d', '#8b6d8f', '#b08b57', '#5f767d', '#8a665f'];
 const MODIFIERS = [
   'at the DMV',
   'with zero aura',
@@ -14,6 +13,25 @@ const MODIFIERS = [
   'inside the backrooms',
   'with maximum rizz',
 ];
+
+export const VISUAL_STYLE_PRESETS = Object.freeze({
+  'cursed-real': Object.freeze({
+    label: 'CURSED REAL',
+    prompt: 'cursed realistic photography, believable physical materials, natural anatomy, practical lighting, subtle uncanny details, social-video realism, no cartoon, no anime, no flat illustration',
+  }),
+  photoreal: Object.freeze({
+    label: 'PHOTOREAL',
+    prompt: 'photorealistic photography, natural skin and material texture, realistic lighting, plausible anatomy and scale, documentary detail, no cartoon, no anime, no illustration',
+  }),
+  cinematic: Object.freeze({
+    label: 'CINEMATIC',
+    prompt: 'cinematic live-action film still, realistic production design, motivated lighting, shallow depth of field, natural textures, restrained color grade, no cartoon, no anime',
+  }),
+  cartoon: Object.freeze({
+    label: 'BRAINROT CARTOON',
+    prompt: 'stylized brainrot cartoon, expressive shapes, bold color, exaggerated comic energy, intentionally illustrated rather than photorealistic',
+  }),
+});
 
 const BLOCKED_TREND_TERMS = [
   'shooting', 'shooter', 'murder', 'murdered', 'killed', 'death', 'dead', 'dies', 'died',
@@ -47,6 +65,15 @@ export function validatePrompt(value = '') {
   return { ok: true, prompt, words, error: '' };
 }
 
+export function normalizeVisualStyle(value = 'cursed-real') {
+  const key = String(value || '').trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(VISUAL_STYLE_PRESETS, key) ? key : 'cursed-real';
+}
+
+export function getVisualStylePreset(value = 'cursed-real') {
+  return VISUAL_STYLE_PRESETS[normalizeVisualStyle(value)];
+}
+
 function safeColor(value, fallback) {
   return /^#[0-9a-f]{6}$/i.test(String(value || '')) ? value : fallback;
 }
@@ -62,6 +89,14 @@ function safeBurst(value, fallback) {
   return text || 'ROT';
 }
 
+function safeField(value, fallback, max = 220) {
+  return String(value || fallback || '')
+    .replace(/[<>]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, max) || String(fallback || '').slice(0, max);
+}
+
 function hashString(value = '') {
   let hash = 2166136261;
   for (const char of String(value)) {
@@ -71,51 +106,153 @@ function hashString(value = '') {
   return hash >>> 0;
 }
 
-export function buildFallbackStory(promptValue) {
-  const prompt = cleanPrompt(promptValue) || 'mystery brainrot';
-  const seed = hashString(prompt);
-  const noun = prompt.replace(/[.!?]+$/g, '');
-  const rows = [
-    `Emergency broadcast: ${noun} just spawned with negative aura and absolutely nobody has the tutorial for this situation.`,
-    `The group chat instantly declares it sigma, but one suspicious frog starts charging everybody a completely imaginary fanum tax.`,
-    `Then the WiFi gains consciousness, whispers Ohio three times, and reroutes the entire operation through a haunted fast food drive thru.`,
-    `Nobody questions it because a tiny shark in sunglasses is mewing aggressively while holding a clipboard marked extremely official business.`,
-    `At this point the lore gets worse: ${noun} unlocks forbidden rizz and the background music legally becomes seventeen percent louder.`,
-    `A random NPC screams plot twist, the floor becomes a loading screen, and every remaining brain cell submits a resignation letter.`,
-    `Just when the aura meter hits zero, the frog returns with receipts and reveals this entire disaster was actually a side quest.`,
-    `Final verdict: ${noun} survives, gains impossible lore, and gets permanently banned from normal conversations for being way too cooked.`,
-  ];
-
-  const scenes = rows.map((text, index) => ({
-    text,
-    emoji: EMOJIS[(seed + index) % EMOJIS.length],
-    color: PALETTE[(seed + index * 3) % PALETTE.length],
-    burst: ['AURA LOSS', 'FANUM TAX', 'OHIO WIFI', 'OFFICIAL LORE', 'RIZZ UNLOCKED', 'PLOT TWIST', 'SIDE QUEST', 'FULLY COOKED'][index],
-  }));
-
-  return { scenes, source: 'local' };
+function fallbackContinuity(prompt) {
+  return {
+    subject: `${prompt}, treated as one recurring believable live-action subject`,
+    appearance: 'same recognizable subject, proportions, wardrobe/materials, and signature details in every scene',
+    world: 'one coherent contemporary real-world environment that becomes increasingly absurd without changing visual identity',
+    props: 'recurring everyday props introduced by the story remain visually consistent',
+  };
 }
 
-export function normalizeScenes(input, promptValue = 'brainrot') {
-  const fallback = buildFallbackStory(promptValue).scenes;
+function sceneVisualPrompt(scene, continuity, style) {
+  const preset = getVisualStylePreset(style);
+  return [
+    preset.prompt,
+    'vertical 9:16 social-video frame',
+    `recurring subject: ${continuity.subject}`,
+    `continuity: ${continuity.appearance}`,
+    `setting: ${scene.setting}`,
+    `action: ${scene.action}`,
+    `camera: ${scene.camera}`,
+    `mood: ${scene.mood}`,
+    'show the described action clearly; no text, captions, logos, watermarks, UI, or speech bubbles inside the generated image',
+  ].join('. ');
+}
+
+export function buildFallbackStory(promptValue, visualStyleValue = 'cursed-real') {
+  const prompt = cleanPrompt(promptValue) || 'mystery brainrot';
+  const visualStyle = normalizeVisualStyle(visualStyleValue);
+  const seed = hashString(prompt);
+  const noun = prompt.replace(/[.!?]+$/g, '');
+  const continuity = fallbackContinuity(noun);
+  const rows = [
+    {
+      text: `Emergency broadcast: ${noun} just arrived at the DMV with negative aura, and every person in line quietly notices something is wrong.`,
+      setting: 'a fluorescent-lit American DMV waiting room with plastic chairs and a numbered-ticket display',
+      action: `${noun} enters the DMV while ordinary people turn and stare`,
+      camera: 'handheld eye-level medium-wide shot with a slow push in',
+      mood: 'deadpan realism with one unsettling absurd detail',
+      burst: 'AURA DETECTED',
+    },
+    {
+      text: `A suspicious frog at the counter starts rating everybody's aura on a clipboard, while the clerk continues working like this is completely normal.`,
+      setting: 'the same DMV service counter and waiting area',
+      action: 'a realistic frog-like clerk marks aura scores on a clipboard while customers wait',
+      camera: 'documentary over-the-shoulder shot, shallow depth of field',
+      mood: 'mundane workplace realism colliding with impossible behavior',
+      burst: 'AURA AUDIT',
+    },
+    {
+      text: `Then the WiFi gains consciousness, the ticket monitor flashes nonsense, and every phone in the room reconnects to the same cursed network.`,
+      setting: 'the same DMV, now focused on ceiling access points, ticket monitor, and customers holding phones',
+      action: 'phones simultaneously reconnect while the ticket display glitches in a physically believable room',
+      camera: 'slow rack focus from a phone screen to the ticket monitor',
+      mood: 'grounded technological horror played as comedy',
+      burst: 'WIFI AWAKENS',
+    },
+    {
+      text: `Nobody leaves because a tiny shark in sunglasses rolls in with an official-looking cart and starts inspecting licenses with terrifying confidence.`,
+      setting: 'the same DMV aisle between rows of plastic chairs',
+      action: 'a small realistic shark-like creature in sunglasses pushes an office cart and inspects licenses',
+      camera: 'low tracking shot following the cart through the waiting room',
+      mood: 'absurd authority presented with serious documentary framing',
+      burst: 'OFFICIAL BUSINESS',
+    },
+    {
+      text: `At this point ${noun} unlocks forbidden rizz, stands under the worst fluorescent light imaginable, and somehow becomes the room's main character.`,
+      setting: 'the same DMV under harsh overhead fluorescent fixtures',
+      action: `${noun} stands confidently while the entire room subtly reorients attention toward them`,
+      camera: 'slow cinematic push-in with restrained lens flare and shallow depth of field',
+      mood: 'unearned cinematic importance inside a painfully ordinary place',
+      burst: 'RIZZ UNLOCKED',
+    },
+    {
+      text: `A random customer whispers plot twist, the floor display turns into a loading bar, and the line advances exactly one impossible inch.`,
+      setting: 'the same DMV floor and queue ropes, with ordinary customers still present',
+      action: 'a realistic illuminated loading-bar pattern appears across the floor while the queue inches forward',
+      camera: 'top-down tilt into a wide reaction shot',
+      mood: 'surreal event treated as a boring inconvenience',
+      burst: 'PLOT TWIST',
+    },
+    {
+      text: `The frog returns with printed receipts proving the entire disaster was a side quest, and every exhausted customer accepts this explanation immediately.`,
+      setting: 'the same DMV counter with receipt printer, paperwork, and tired customers',
+      action: 'frog clerk holds long printed receipts while customers study them with resigned expressions',
+      camera: 'close-up on receipts, then gentle handheld pullback to the group',
+      mood: 'bureaucratic realism with absurd lore payoff',
+      burst: 'SIDE QUEST',
+    },
+    {
+      text: `Final verdict: ${noun} survives, gains impossible lore, and walks out as the DMV doors close behind one completely defeated employee.`,
+      setting: 'the DMV entrance at dusk, same visual world and recurring characters',
+      action: `${noun} exits through automatic doors while the clerk watches from inside`,
+      camera: 'cinematic rear three-quarter tracking shot ending on the closing doors',
+      mood: 'triumphant but understated final shot with a deadpan punchline',
+      burst: 'FULLY COOKED',
+    },
+  ];
+
+  const scenes = rows.map((row, index) => {
+    const scene = {
+      text: row.text,
+      color: PALETTE[(seed + index * 3) % PALETTE.length],
+      burst: row.burst,
+      subject: continuity.subject,
+      setting: row.setting,
+      action: row.action,
+      camera: row.camera,
+      mood: row.mood,
+    };
+    return { ...scene, visualPrompt: sceneVisualPrompt(scene, continuity, visualStyle) };
+  });
+
+  return { scenes, continuity, visualStyle, source: 'local' };
+}
+
+export function normalizeScenes(input, promptValue = 'brainrot', visualStyleValue = 'cursed-real', continuityValue = null) {
+  const visualStyle = normalizeVisualStyle(visualStyleValue);
+  const fallbackStory = buildFallbackStory(promptValue, visualStyle);
+  const fallback = fallbackStory.scenes;
+  const continuity = {
+    ...fallbackStory.continuity,
+    ...(continuityValue && typeof continuityValue === 'object' ? continuityValue : {}),
+  };
   const provided = Array.isArray(input) ? input.slice(0, SCENE_COUNT) : [];
-  const scenes = Array.from({ length: SCENE_COUNT }, (_, index) => {
+
+  return Array.from({ length: SCENE_COUNT }, (_, index) => {
     const candidate = provided[index] || fallback[index];
     const fallbackScene = fallback[index];
-    const text = String(candidate?.text || fallbackScene.text)
-      .replace(/[<>]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 360) || fallbackScene.text;
-    const emoji = String(candidate?.emoji || fallbackScene.emoji).trim().slice(0, 8) || fallbackScene.emoji;
-    return {
-      text,
-      emoji,
+    const scene = {
+      text: safeField(candidate?.text, fallbackScene.text, 360),
       color: safeColor(candidate?.color, fallbackScene.color),
       burst: safeBurst(candidate?.burst, fallbackScene.burst),
+      subject: safeField(candidate?.subject, continuity.subject),
+      setting: safeField(candidate?.setting, fallbackScene.setting),
+      action: safeField(candidate?.action, fallbackScene.action),
+      camera: safeField(candidate?.camera, fallbackScene.camera),
+      mood: safeField(candidate?.mood, fallbackScene.mood),
     };
+    scene.visualPrompt = safeField(
+      candidate?.visualPrompt,
+      sceneVisualPrompt(scene, continuity, visualStyle),
+      1600,
+    );
+    if (!/vertical|9:16/i.test(scene.visualPrompt)) {
+      scene.visualPrompt = `${scene.visualPrompt}. vertical 9:16 social-video frame`;
+    }
+    return scene;
   });
-  return scenes;
 }
 
 export function storyWordCount(scenes = []) {
