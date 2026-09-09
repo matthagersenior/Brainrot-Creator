@@ -8,6 +8,8 @@ import {
   isSafeTrend,
   trendToPrompt,
   normalizeScenes,
+  normalizeVisualStyle,
+  getVisualStylePreset,
 } from '../app-core.mjs';
 
 test('countWords and validatePrompt enforce nine-word limit', () => {
@@ -16,22 +18,45 @@ test('countWords and validatePrompt enforce nine-word limit', () => {
   assert.equal(validatePrompt('one two three four five six seven eight nine ten').ok, false);
 });
 
-test('fallback story always has eight valid scenes', () => {
-  const story = buildFallbackStory('Nintendo at the DMV');
+test('fallback story always has eight valid story-driven visual scenes', () => {
+  const story = buildFallbackStory('Nintendo at the DMV', 'cursed-real');
   assert.equal(story.scenes.length, 8);
+  assert.ok(story.continuity?.subject);
+  assert.equal(story.visualStyle, 'cursed-real');
   for (const scene of story.scenes) {
     assert.ok(scene.text.length > 0);
     assert.match(scene.color, /^#[0-9a-f]{6}$/i);
-    assert.ok(scene.emoji);
     assert.ok(scene.burst);
+    assert.ok(scene.subject);
+    assert.ok(scene.setting);
+    assert.ok(scene.action);
+    assert.ok(scene.camera);
+    assert.ok(scene.mood);
+    assert.match(scene.visualPrompt, /vertical/i);
   }
 });
 
-test('normalizeScenes repairs malformed provider scenes to eight scenes', () => {
-  const scenes = normalizeScenes([{ text: 'hello world', emoji: '💀', color: 'bad', burst: 'hello' }], 'test');
+test('normalizeScenes repairs malformed provider scenes to eight story-driven scenes', () => {
+  const scenes = normalizeScenes([{ text: 'hello world', color: 'bad', burst: 'hello' }], 'test', 'photoreal');
   assert.equal(scenes.length, 8);
   assert.match(scenes[0].color, /^#[0-9a-f]{6}$/i);
   assert.equal(scenes[0].burst, 'HELLO');
+  assert.ok(scenes[0].subject);
+  assert.ok(scenes[0].setting);
+  assert.ok(scenes[0].action);
+  assert.ok(scenes[0].camera);
+  assert.ok(scenes[0].mood);
+  assert.match(scenes[0].visualPrompt, /photo|real|cinematic/i);
+});
+
+test('visual style presets default to cursed-real and distinguish realism modes', () => {
+  assert.equal(normalizeVisualStyle(), 'cursed-real');
+  assert.equal(normalizeVisualStyle('unknown'), 'cursed-real');
+  assert.equal(normalizeVisualStyle('photoreal'), 'photoreal');
+  assert.match(getVisualStylePreset('cursed-real').prompt, /real/i);
+  assert.match(getVisualStylePreset('photoreal').prompt, /photo/i);
+  assert.match(getVisualStylePreset('cinematic').prompt, /cinematic/i);
+  assert.match(getVisualStylePreset('cartoon').prompt, /cartoon/i);
 });
 
 test('timeline fills exactly sixty seconds with no gaps', () => {
