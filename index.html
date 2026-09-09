@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#090011">
-  <meta name="description" content="Turn nine words or fewer into a narrated 60-second Brainrot video.">
+  <meta name="description" content="Turn nine words or fewer into a narrated, story-synced 60-second Brainrot video.">
   <title>ROT MACHINE — Brainrot Creator</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
@@ -15,13 +15,13 @@
         <h1 class="brand">ROT MACHINE</h1>
         <span class="free-badge">$0-FIRST MODE</span>
       </div>
-      <p class="tagline">Nine words in. One minute of AI-written, narrated, subtitled, aggressively animated nonsense out.</p>
+      <p class="tagline">Nine words in. One minute of AI-written, narrated, subtitled, story-matched chaos out.</p>
     </header>
 
     <div class="layout">
       <section class="panel creator-panel" aria-labelledby="creatorTitle">
         <h2 id="creatorTitle">COOK THE ROT</h2>
-        <p class="panel-copy">Keep it tiny. The machine does the overthinking for you.</p>
+        <p class="panel-copy">Keep the prompt tiny. The machine writes the story, plans each shot, and tries to visualize every beat.</p>
 
         <div class="trend-head">
           <strong>TRENDING ROT 🔥</strong>
@@ -35,12 +35,23 @@
         </div>
 
         <div class="control-grid">
-          <div></div>
-          <select id="chaosSelect" class="chaos-select" aria-label="Chaos level">
-            <option value="chill">CHAOS: 6/10</option>
-            <option value="cooked" selected>CHAOS: 10/10</option>
-            <option value="nuclear">CHAOS: 14/10</option>
-          </select>
+          <label class="control-field">
+            <span>VISUAL STYLE</span>
+            <select id="visualStyleSelect" class="visual-style-select" aria-label="Visual style">
+              <option value="cursed-real" selected>CURSED REAL</option>
+              <option value="photoreal">PHOTOREAL</option>
+              <option value="cinematic">CINEMATIC</option>
+              <option value="cartoon">BRAINROT CARTOON</option>
+            </select>
+          </label>
+          <label class="control-field">
+            <span>ENERGY</span>
+            <select id="chaosSelect" class="chaos-select" aria-label="Chaos level">
+              <option value="chill">CHAOS: 6/10</option>
+              <option value="cooked" selected>CHAOS: 10/10</option>
+              <option value="nuclear">CHAOS: 14/10</option>
+            </select>
+          </label>
         </div>
 
         <div class="btn-row">
@@ -56,7 +67,13 @@
         <div class="sources" aria-label="Current generation sources">
           <span class="source-pill">Story: <b id="storySource">local fallback</b></span>
           <span class="source-pill">Voice: <b id="voiceSource">device voice</b></span>
+          <span class="source-pill">Visuals: <b id="visualSource">cinematic fallback</b></span>
           <span class="source-pill">Trends: <b id="trendSourcePill">built-in rotation</b></span>
+        </div>
+
+        <div class="visual-note">
+          <strong>STORY-SYNCED VISUALS</strong>
+          <span>Each scene keeps a continuity profile and gets its own subject, setting, action, camera, mood, and image prompt.</span>
         </div>
 
         <div class="mini-facts">
@@ -69,7 +86,7 @@
       <section class="panel stage-panel" aria-label="Brainrot video preview">
         <div class="stage-shell">
           <canvas id="videoCanvas" width="720" height="1280" aria-label="Generated vertical video canvas"></canvas>
-          <span class="canvas-badge">9:16 • 720×1280</span>
+          <span class="canvas-badge">9:16 • STORY SYNC</span>
         </div>
 
         <div class="player-controls">
@@ -78,12 +95,12 @@
           <button id="stopBtn" class="btn btn-dark" type="button" disabled>■ STOP</button>
           <button id="downloadBtn" class="btn btn-download" type="button" disabled>⬇ VIDEO</button>
         </div>
-        <p id="downloadNote" class="download-note">Generate a rot first. Narrated export uses the same canvas you preview.</p>
+        <p id="downloadNote" class="download-note">Generate a rot first. AI scene images are composited into the same 60-second canvas used for export.</p>
       </section>
     </div>
 
     <footer>
-      Google Trends suggestions are filtered conservatively before becoming joke prompts. Real-person voice cloning is not used. Provider APIs are optional; the app keeps a no-secret fallback path.
+      Live trend suggestions are filtered conservatively before becoming joke prompts. AI scene images use the selected style and story plan when Workers AI capacity is available. Real-person voice cloning is not used.
     </footer>
   </main>
 
