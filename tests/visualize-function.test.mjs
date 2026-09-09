@@ -33,7 +33,8 @@ test('visualize endpoint uses Cloudflare FLUX and returns a data URI', async () 
 
   assert.equal(response.status, 200);
   assert.equal(model, '@cf/black-forest-labs/flux-1-schnell');
-  assert.equal(input.seed, 42);
+  assert.equal(Object.hasOwn(input, 'seed'), false, 'FLUX input must not include unsupported seed');
+  assert.equal(body.seed, 42, 'seed may remain response metadata for client bookkeeping');
   assert.match(input.prompt, /realistic/i);
   assert.match(input.prompt, /vertical/i);
   assert.match(body.dataURI, /^data:image\/jpeg;base64,/);
