@@ -129,6 +129,7 @@ jobs:
         shell: bash
         run: |
           npx --yes wrangler@4 pages deploy .pages-dist \
+            --config=wrangler.jsonc \
             --project-name="$CLOUDFLARE_PAGES_PROJECT" \
             --branch=main \
             --commit-hash="$GITHUB_SHA" \
@@ -143,6 +144,7 @@ jobs:
 
           curl --fail --silent --show-error --retry 12 --retry-delay 2 --retry-all-errors "$base/" > "$RUNNER_TEMP/page.html"
           grep -q 'ROT MACHINE' "$RUNNER_TEMP/page.html"
+          grep -q 'visualStyleSelect' "$RUNNER_TEMP/page.html"
           echo "Live page passed."
 
           curl --fail --silent --show-error --retry 6 --retry-delay 2 --retry-all-errors \
@@ -155,13 +157,13 @@ jobs:
             --write-out '%{http_code}' \
             -X POST "$base/api/story" \
             -H 'content-type: application/json' \
-            --data '{"prompt":"frog at the DMV"}')"
+            --data '{"prompt":"frog at the DMV","visualStyle":"cursed-real"}')"
           if [[ "$story_status" != "200" ]]; then
             echo "Story endpoint failed with HTTP $story_status:"
             cat "$RUNNER_TEMP/story.json"
             exit 1
           fi
-          jq -e '(.source | startswith("gemini-")) and (.scenes | length == 8)' "$RUNNER_TEMP/story.json" >/dev/null
+          jq -e '(.source | startswith("gemini-")) and (.visualStyle == "cursed-real") and (.scenes | length == 8)' "$RUNNER_TEMP/story.json" >/dev/null
           echo "Gemini story endpoint passed."
 
           narrate_status="$(curl --silent --show-error --retry 3 --retry-delay 2 --retry-all-errors \
@@ -178,4 +180,23 @@ jobs:
           jq -e '(.source | startswith("gemini-")) and (.sampleRate == 24000) and (.pcmBase64 | length > 1000)' "$RUNNER_TEMP/narrate.json" >/dev/null
           echo "Gemini narration endpoint passed."
 
-          echo "Cloudflare production smoke test passed: page, trends, Gemini story, and Gemini narration."
+          visual_prompt="$(jq -r '.scenes[0].visualPrompt // "cursed realistic frog at a DMV, vertical 9:16 frame"' "$RUNNER_TEMP/story.json")"
+          visual_status="$(curl --silent --show-error --retry 2 --retry-delay 2 --retry-all-errors \
+            --output "$RUNNER_TEMP/visual.json" \
+            --write-out '%{http_code}' \
+            -X POST "$base/api/visualize" \
+            -H 'content-type: application/json' \
+            --data "$(jq -nc --arg p "$visual_prompt" '{visualPrompt:$p,style:"cursed-real",seed:42}')")"
+          if [[ "$visual_status" == "200" ]]; then
+            jq -e '(.source == "cloudflare-flux-1-schnell") and (.dataURI | startswith("data:image/jpeg;base64,"))' "$RUNNER_TEMP/visual.json" >/dev/null
+            echo "Workers AI scene visual endpoint passed."
+          elif [[ "$visual_status" == "503" ]]; then
+            echo "Visual endpoint is missing the Workers AI binding:"
+            cat "$RUNNER_TEMP/visual.json"
+            exit 1
+          else
+            echo "::notice::Workers AI binding is present but image generation is temporarily unavailable (HTTP $visual_status); client cinematic fallback remains active."
+            cat "$RUNNER_TEMP/visual.json"
+          fi
+
+          echo "Cloudflare production smoke test passed: page, trends, story, narration, and visual binding."
