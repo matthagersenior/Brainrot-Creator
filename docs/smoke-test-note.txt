@@ -1,0 +1,1 @@
+Cloudflare production deployment is verified after deploy by checking the live page, trends endpoint, Gemini story generation, and Gemini narration endpoint.
