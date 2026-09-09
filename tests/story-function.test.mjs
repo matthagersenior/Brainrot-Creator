@@ -41,12 +41,14 @@ function storyRequest() {
   });
 }
 
-test('story endpoint prefers Gemini 3.1 Flash-Lite for fast structured stories', async () => {
+test('story endpoint prefers Gemini 3.1 Flash-Lite and requires an eight-scene structured JSON schema', async () => {
   const originalFetch = globalThis.fetch;
   let requestedUrl = '';
+  let requestedBody = null;
 
-  globalThis.fetch = async (url) => {
+  globalThis.fetch = async (url, init = {}) => {
     requestedUrl = String(url);
+    requestedBody = JSON.parse(String(init.body || '{}'));
     return successfulGeminiResponse();
   };
 
@@ -58,6 +60,15 @@ test('story endpoint prefers Gemini 3.1 Flash-Lite for fast structured stories',
     assert.match(requestedUrl, /models\/gemini-3\.1-flash-lite:generateContent$/);
     assert.equal(body.source, 'gemini-3.1-flash-lite');
     assert.equal(body.scenes.length, 8);
+    assert.equal(requestedBody.generationConfig.responseMimeType, 'application/json');
+    assert.equal(requestedBody.generationConfig.responseJsonSchema.type, 'object');
+    assert.deepEqual(requestedBody.generationConfig.responseJsonSchema.required, ['continuity', 'scenes']);
+    assert.equal(requestedBody.generationConfig.responseJsonSchema.properties.scenes.minItems, 8);
+    assert.equal(requestedBody.generationConfig.responseJsonSchema.properties.scenes.maxItems, 8);
+    assert.deepEqual(
+      requestedBody.generationConfig.responseJsonSchema.properties.scenes.items.required,
+      ['text', 'color', 'burst', 'subject', 'setting', 'action', 'camera', 'mood', 'visualPrompt'],
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }

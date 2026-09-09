@@ -164,7 +164,21 @@ jobs:
           jq -e '.source and (.trends | type == "array")' "$RUNNER_TEMP/trends.json" >/dev/null
           echo "Trend endpoint passed."
 
-          story_status="$(curl --silent --show-error --retry 3 --retry-delay 2 --retry-all-errors \
+          visual_status="$(curl --silent --show-error --max-time 45 \
+            --output "$RUNNER_TEMP/visual.json" \
+            --write-out '%{http_code}' \
+            -X POST "$base/api/visualize" \
+            -H 'content-type: application/json' \
+            --data '{"visualPrompt":"Cursed realistic frog waiting inside an American DMV, believable live-action photography, vertical 9:16, no text, no logos, no watermarks","style":"cursed-real","seed":42}')"
+          if [[ "$visual_status" != "200" ]]; then
+            echo "Workers AI scene visual endpoint failed with HTTP $visual_status:"
+            cat "$RUNNER_TEMP/visual.json"
+            exit 1
+          fi
+          jq -e '(.source == "cloudflare-flux-1-schnell") and (.dataURI | startswith("data:image/jpeg;base64,")) and (.dataURI | length > 1000)' "$RUNNER_TEMP/visual.json" >/dev/null
+          echo "Workers AI scene visual endpoint passed with a real image payload."
+
+          story_status="$(curl --silent --show-error --max-time 75 \
             --output "$RUNNER_TEMP/story.json" \
             --write-out '%{http_code}' \
             -X POST "$base/api/story" \
@@ -192,23 +206,4 @@ jobs:
           jq -e '(.source | startswith("gemini-")) and (.sampleRate == 24000) and (.pcmBase64 | length > 1000)' "$RUNNER_TEMP/narrate.json" >/dev/null
           echo "Gemini narration endpoint passed."
 
-          visual_prompt="$(jq -r '.scenes[0].visualPrompt // "cursed realistic frog at a DMV, vertical 9:16 frame"' "$RUNNER_TEMP/story.json")"
-          visual_status="$(curl --silent --show-error --retry 2 --retry-delay 2 --retry-all-errors \
-            --output "$RUNNER_TEMP/visual.json" \
-            --write-out '%{http_code}' \
-            -X POST "$base/api/visualize" \
-            -H 'content-type: application/json' \
-            --data "$(jq -nc --arg p "$visual_prompt" '{visualPrompt:$p,style:"cursed-real",seed:42}')")"
-          if [[ "$visual_status" == "200" ]]; then
-            jq -e '(.source == "cloudflare-flux-1-schnell") and (.dataURI | startswith("data:image/jpeg;base64,"))' "$RUNNER_TEMP/visual.json" >/dev/null
-            echo "Workers AI scene visual endpoint passed."
-          elif [[ "$visual_status" == "503" ]]; then
-            echo "Visual endpoint is missing the Workers AI binding:"
-            cat "$RUNNER_TEMP/visual.json"
-            exit 1
-          else
-            echo "::notice::Workers AI binding is present but image generation is temporarily unavailable (HTTP $visual_status); client cinematic fallback remains active."
-            cat "$RUNNER_TEMP/visual.json"
-          fi
-
-          echo "Cloudflare production smoke test passed: page, trends, story, narration, and visual binding."
+          echo "Cloudflare production smoke test passed: page, trends, real FLUX image, structured story, and narration."
