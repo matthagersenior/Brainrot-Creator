@@ -60,7 +60,6 @@ export async function onRequestPost({ request, env }) {
   try {
     const result = await env.AI.run(MODEL, {
       prompt: prompt.slice(0, 2048),
-      seed,
       steps: 4,
     });
     const image = typeof result?.image === 'string' ? result.image : '';
