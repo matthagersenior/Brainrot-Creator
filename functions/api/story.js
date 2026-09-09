@@ -13,6 +13,47 @@ const VISUAL_STYLES = {
   cartoon: 'stylized brainrot cartoon: bold illustrated forms, expressive shapes, intentionally non-photorealistic',
 };
 
+const STRING_FIELD = { type: 'string', minLength: 1 };
+const STORY_JSON_SCHEMA = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    continuity: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        subject: STRING_FIELD,
+        appearance: STRING_FIELD,
+        world: STRING_FIELD,
+        props: STRING_FIELD,
+      },
+      required: ['subject', 'appearance', 'world', 'props'],
+    },
+    scenes: {
+      type: 'array',
+      minItems: 8,
+      maxItems: 8,
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          text: STRING_FIELD,
+          color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' },
+          burst: STRING_FIELD,
+          subject: STRING_FIELD,
+          setting: STRING_FIELD,
+          action: STRING_FIELD,
+          camera: STRING_FIELD,
+          mood: STRING_FIELD,
+          visualPrompt: STRING_FIELD,
+        },
+        required: ['text', 'color', 'burst', 'subject', 'setting', 'action', 'camera', 'mood', 'visualPrompt'],
+      },
+    },
+  },
+  required: ['continuity', 'scenes'],
+};
+
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
 }
@@ -31,18 +72,32 @@ function normalizeStyle(value) {
   return Object.prototype.hasOwnProperty.call(VISUAL_STYLES, style) ? style : 'cursed-real';
 }
 
+function parseJsonText(raw) {
+  const cleaned = String(raw || '').replace(/```json|```/gi, '').trim();
+  if (!cleaned) return null;
+
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    const start = cleaned.indexOf('{');
+    const end = cleaned.lastIndexOf('}');
+    if (start < 0 || end <= start) return null;
+    try {
+      return JSON.parse(cleaned.slice(start, end + 1));
+    } catch {
+      return null;
+    }
+  }
+}
+
 function parseStoryCandidate(result) {
   const raw = result?.candidates?.[0]?.content?.parts?.find(part => typeof part?.text === 'string')?.text;
   if (!raw) return { ok: false, error: 'GEMINI_STORY_EMPTY' };
 
-  let parsed;
-  try {
-    parsed = JSON.parse(raw.replace(/```json|```/gi, '').trim());
-  } catch {
-    return { ok: false, error: 'GEMINI_STORY_INVALID_JSON' };
-  }
+  const parsed = parseJsonText(raw);
+  if (!parsed) return { ok: false, error: 'GEMINI_STORY_INVALID_JSON' };
 
-  if (!Array.isArray(parsed?.scenes) || parsed.scenes.length < 1) {
+  if (!Array.isArray(parsed?.scenes) || parsed.scenes.length !== 8) {
     return { ok: false, error: 'GEMINI_STORY_INVALID_SHAPE' };
   }
 
@@ -92,28 +147,7 @@ export async function onRequestPost({ request, env }) {
 
 The visual style is: ${VISUAL_STYLES[visualStyle]}.
 
-Return JSON only with exactly this structure:
-{
-  "continuity": {
-    "subject": "one concise recurring main-subject description",
-    "appearance": "fixed appearance/material/wardrobe details that must persist",
-    "world": "fixed recurring environment/world description",
-    "props": "recurring props or visual motifs"
-  },
-  "scenes": [
-    {
-      "text": "spoken narration",
-      "color": "#6f7f8f",
-      "burst": "AURA LOSS",
-      "subject": "what recurring subject is visible here",
-      "setting": "specific visible location for this scene",
-      "action": "literal visible action matching this scene's narration",
-      "camera": "realistic camera framing and movement",
-      "mood": "visual mood",
-      "visualPrompt": "standalone text-to-image prompt for this exact scene"
-    }
-  ]
-}
+Return JSON only with exactly the schema requested by the API.
 
 Rules:
 - Exactly 8 scenes.
@@ -136,7 +170,8 @@ Rules:
     contents: [{ role: 'user', parts: [{ text: systemPrompt }] }],
     generationConfig: {
       responseMimeType: 'application/json',
-      temperature: 0.9,
+      responseJsonSchema: STORY_JSON_SCHEMA,
+      temperature: 0.8,
       maxOutputTokens: 3600,
     },
   });
@@ -187,7 +222,7 @@ Rules:
       ? candidate.parsed.continuity
       : {};
     return json({
-      scenes: candidate.parsed.scenes.slice(0, 8),
+      scenes: candidate.parsed.scenes,
       continuity,
       visualStyle,
       source: model,
