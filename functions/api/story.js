@@ -3,8 +3,9 @@ const JSON_HEADERS = {
   'cache-control': 'no-store',
 };
 
-const STORY_MODELS = ['gemini-3.6-flash', 'gemini-3.1-flash-lite'];
-const RETRYABLE_PROVIDER_STATUS = new Set([429, 500, 502, 503, 504]);
+const STORY_MODELS = ['gemini-3.1-flash-lite', 'gemini-3.6-flash'];
+const RETRYABLE_PROVIDER_STATUS = new Set([404, 429, 500, 502, 503, 504]);
+const MODEL_TIMEOUT_MS = 30_000;
 const VISUAL_STYLES = {
   'cursed-real': 'cursed realistic live-action photography: believable physical materials, natural anatomy, practical lighting, subtly uncanny details, no cartoon, no anime',
   photoreal: 'photorealistic documentary photography: natural textures, plausible anatomy and scale, real-world lighting, no cartoon, no anime, no illustration',
@@ -28,6 +29,45 @@ function countWords(value) {
 function normalizeStyle(value) {
   const style = String(value || '').trim().toLowerCase();
   return Object.prototype.hasOwnProperty.call(VISUAL_STYLES, style) ? style : 'cursed-real';
+}
+
+function parseStoryCandidate(result) {
+  const raw = result?.candidates?.[0]?.content?.parts?.find(part => typeof part?.text === 'string')?.text;
+  if (!raw) return { ok: false, error: 'GEMINI_STORY_EMPTY' };
+
+  let parsed;
+  try {
+    parsed = JSON.parse(raw.replace(/```json|```/gi, '').trim());
+  } catch {
+    return { ok: false, error: 'GEMINI_STORY_INVALID_JSON' };
+  }
+
+  if (!Array.isArray(parsed?.scenes) || parsed.scenes.length < 1) {
+    return { ok: false, error: 'GEMINI_STORY_INVALID_SHAPE' };
+  }
+
+  return { ok: true, parsed };
+}
+
+async function fetchModel(model, apiKey, requestBody) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), MODEL_TIMEOUT_MS);
+  try {
+    return await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
+        body: requestBody,
+        signal: controller.signal,
+      },
+    );
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function onRequestPost({ request, env }) {
@@ -96,61 +136,63 @@ Rules:
     contents: [{ role: 'user', parts: [{ text: systemPrompt }] }],
     generationConfig: {
       responseMimeType: 'application/json',
-      temperature: 1.05,
-      maxOutputTokens: 5200,
+      temperature: 0.9,
+      maxOutputTokens: 3600,
     },
   });
 
-  let response;
-  let model = STORY_MODELS[0];
+  let lastError = { error: 'GEMINI_STORY_FAILED', detail: 'No Gemini story model was available.' };
 
   for (let index = 0; index < STORY_MODELS.length; index += 1) {
-    model = STORY_MODELS[index];
-    response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-      {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-goog-api-key': env.GEMINI_API_KEY,
-        },
-        body: requestBody,
-      },
-    );
+    const model = STORY_MODELS[index];
+    const hasFallback = index < STORY_MODELS.length - 1;
+    let response;
 
-    if (response.ok) break;
+    try {
+      response = await fetchModel(model, env.GEMINI_API_KEY, requestBody);
+    } catch (error) {
+      const timedOut = error?.name === 'AbortError';
+      lastError = {
+        error: timedOut ? 'GEMINI_STORY_TIMEOUT' : 'GEMINI_STORY_FAILED',
+        detail: timedOut ? `${model} exceeded ${MODEL_TIMEOUT_MS / 1000}s.` : String(error?.message || error || 'Gemini request failed').slice(0, 400),
+      };
+      if (hasFallback) continue;
+      return json(lastError, 502);
+    }
 
-    const canFallback = index < STORY_MODELS.length - 1 && RETRYABLE_PROVIDER_STATUS.has(response.status);
-    if (canFallback) continue;
+    if (!response.ok) {
+      const detail = await response.text().catch(() => '');
+      lastError = { error: 'GEMINI_STORY_FAILED', detail: detail.slice(0, 400) };
+      if (hasFallback && RETRYABLE_PROVIDER_STATUS.has(response.status)) continue;
+      return json(lastError, 502);
+    }
 
-    const detail = await response.text().catch(() => '');
-    return json({ error: 'GEMINI_STORY_FAILED', detail: detail.slice(0, 400) }, 502);
+    let result;
+    try {
+      result = await response.json();
+    } catch {
+      lastError = { error: 'GEMINI_STORY_INVALID_PROVIDER_JSON' };
+      if (hasFallback) continue;
+      return json(lastError, 502);
+    }
+
+    const candidate = parseStoryCandidate(result);
+    if (!candidate.ok) {
+      lastError = { error: candidate.error };
+      if (hasFallback) continue;
+      return json(lastError, 502);
+    }
+
+    const continuity = candidate.parsed?.continuity && typeof candidate.parsed.continuity === 'object'
+      ? candidate.parsed.continuity
+      : {};
+    return json({
+      scenes: candidate.parsed.scenes.slice(0, 8),
+      continuity,
+      visualStyle,
+      source: model,
+    });
   }
 
-  if (!response?.ok) {
-    return json({ error: 'GEMINI_STORY_FAILED', detail: 'No Gemini story model was available.' }, 502);
-  }
-
-  const result = await response.json();
-  const raw = result?.candidates?.[0]?.content?.parts?.find(part => typeof part?.text === 'string')?.text;
-  if (!raw) return json({ error: 'GEMINI_STORY_EMPTY' }, 502);
-
-  let parsed;
-  try {
-    parsed = JSON.parse(raw.replace(/```json|```/gi, '').trim());
-  } catch {
-    return json({ error: 'GEMINI_STORY_INVALID_JSON' }, 502);
-  }
-
-  if (!Array.isArray(parsed?.scenes) || parsed.scenes.length < 1) {
-    return json({ error: 'GEMINI_STORY_INVALID_SHAPE' }, 502);
-  }
-
-  const continuity = parsed?.continuity && typeof parsed.continuity === 'object' ? parsed.continuity : {};
-  return json({
-    scenes: parsed.scenes.slice(0, 8),
-    continuity,
-    visualStyle,
-    source: model,
-  });
+  return json(lastError, 502);
 }
