@@ -52,7 +52,7 @@ Rules:
 - Never imitate or request a real person's voice.`;
 
   const response = await fetch(
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
+    'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent',
     {
       method: 'POST',
       headers: {
@@ -90,5 +90,5 @@ Rules:
     return json({ error: 'GEMINI_STORY_INVALID_SHAPE' }, 502);
   }
 
-  return json({ scenes: parsed.scenes.slice(0, 8), source: 'gemini-2.5-flash' });
+  return json({ scenes: parsed.scenes.slice(0, 8), source: 'gemini-3.6-flash' });
 }
