@@ -21,3 +21,11 @@ test('client requests scene images and renders image-backed frames', async () =>
   assert.match(app, /drawImage/);
   assert.match(app, /visualStyleSelect/);
 });
+
+test('client generates scene one first and reuses a downsized reference for later scene continuity', async () => {
+  const app = await readFile(new URL('app.mjs', root), 'utf8');
+  assert.match(app, /referenceDataURI/);
+  assert.match(app, /makeReferenceDataURI/);
+  assert.match(app, /requestSceneImage\(scenes\[0\]/);
+  assert.match(app, /input image|identity reference|reference/i);
+});
