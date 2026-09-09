@@ -13,7 +13,7 @@ const VISUAL_STYLES = {
   cartoon: 'stylized brainrot cartoon: bold illustrated forms, expressive shapes, intentionally non-photorealistic',
 };
 
-const STRING_FIELD = { type: 'string', minLength: 1 };
+const STRING_FIELD = { type: 'string' };
 const STORY_JSON_SCHEMA = {
   type: 'object',
   additionalProperties: false,
@@ -38,7 +38,7 @@ const STORY_JSON_SCHEMA = {
         additionalProperties: false,
         properties: {
           text: STRING_FIELD,
-          color: { type: 'string', pattern: '^#[0-9A-Fa-f]{6}$' },
+          color: STRING_FIELD,
           burst: STRING_FIELD,
           subject: STRING_FIELD,
           setting: STRING_FIELD,
