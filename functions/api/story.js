@@ -3,6 +3,9 @@ const JSON_HEADERS = {
   'cache-control': 'no-store',
 };
 
+const STORY_MODELS = ['gemini-3.6-flash', 'gemini-3.1-flash-lite'];
+const RETRYABLE_PROVIDER_STATUS = new Set([429, 500, 502, 503, 504]);
+
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
 }
@@ -51,28 +54,43 @@ Rules:
 - No slurs, sexual content involving minors, graphic violence, self-harm encouragement, tragedy jokes, or instructions for wrongdoing.
 - Never imitate or request a real person's voice.`;
 
-  const response = await fetch(
-    'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent',
-    {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-goog-api-key': env.GEMINI_API_KEY,
-      },
-      body: JSON.stringify({
-        contents: [{ role: 'user', parts: [{ text: systemPrompt }] }],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          temperature: 1.15,
-          maxOutputTokens: 2200,
-        },
-      }),
+  const requestBody = JSON.stringify({
+    contents: [{ role: 'user', parts: [{ text: systemPrompt }] }],
+    generationConfig: {
+      responseMimeType: 'application/json',
+      temperature: 1.15,
+      maxOutputTokens: 2200,
     },
-  );
+  });
 
-  if (!response.ok) {
+  let response;
+  let model = STORY_MODELS[0];
+
+  for (let index = 0; index < STORY_MODELS.length; index += 1) {
+    model = STORY_MODELS[index];
+    response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-goog-api-key': env.GEMINI_API_KEY,
+        },
+        body: requestBody,
+      },
+    );
+
+    if (response.ok) break;
+
+    const canFallback = index < STORY_MODELS.length - 1 && RETRYABLE_PROVIDER_STATUS.has(response.status);
+    if (canFallback) continue;
+
     const detail = await response.text().catch(() => '');
     return json({ error: 'GEMINI_STORY_FAILED', detail: detail.slice(0, 400) }, 502);
+  }
+
+  if (!response?.ok) {
+    return json({ error: 'GEMINI_STORY_FAILED', detail: 'No Gemini story model was available.' }, 502);
   }
 
   const result = await response.json();
@@ -90,5 +108,5 @@ Rules:
     return json({ error: 'GEMINI_STORY_INVALID_SHAPE' }, 502);
   }
 
-  return json({ scenes: parsed.scenes.slice(0, 8), source: 'gemini-3.6-flash' });
+  return json({ scenes: parsed.scenes.slice(0, 8), source: model });
 }
