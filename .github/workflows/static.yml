@@ -88,11 +88,22 @@ jobs:
         if: steps.cloudflare.outputs.ready == 'true'
         shell: bash
         run: |
-          npx --yes wrangler@4 pages project list --json > "$RUNNER_TEMP/pages-projects.json"
-          if jq -e --arg project "$CLOUDFLARE_PAGES_PROJECT" '.. | objects | select(.name? == $project)' "$RUNNER_TEMP/pages-projects.json" >/dev/null; then
+          set -euo pipefail
+          project_url="https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/${CLOUDFLARE_PAGES_PROJECT}"
+          status="$(curl --silent --show-error \
+            --output "$RUNNER_TEMP/pages-project.json" \
+            --write-out '%{http_code}' \
+            --header "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            "$project_url")"
+
+          if [[ "$status" == "200" ]]; then
             echo "Cloudflare Pages project $CLOUDFLARE_PAGES_PROJECT already exists."
-          else
+          elif [[ "$status" == "404" ]]; then
             npx --yes wrangler@4 pages project create "$CLOUDFLARE_PAGES_PROJECT" --production-branch=main
+          else
+            echo "Cloudflare project lookup failed with HTTP $status."
+            cat "$RUNNER_TEMP/pages-project.json"
+            exit 1
           fi
 
       - name: Sync Gemini key to Cloudflare
@@ -120,7 +131,8 @@ jobs:
           npx --yes wrangler@4 pages deploy .pages-dist \
             --project-name="$CLOUDFLARE_PAGES_PROJECT" \
             --branch=main \
-            --commit-hash="$GITHUB_SHA"
+            --commit-hash="$GITHUB_SHA" \
+            --commit-dirty=true
 
       - name: Smoke test Cloudflare production
         if: steps.cloudflare.outputs.ready == 'true'
