@@ -143,21 +143,39 @@ jobs:
 
           curl --fail --silent --show-error --retry 12 --retry-delay 2 --retry-all-errors "$base/" > "$RUNNER_TEMP/page.html"
           grep -q 'ROT MACHINE' "$RUNNER_TEMP/page.html"
+          echo "Live page passed."
 
           curl --fail --silent --show-error --retry 6 --retry-delay 2 --retry-all-errors \
             "$base/api/trends" > "$RUNNER_TEMP/trends.json"
           jq -e '.source and (.trends | type == "array")' "$RUNNER_TEMP/trends.json" >/dev/null
+          echo "Trend endpoint passed."
 
-          curl --fail --silent --show-error --retry 3 --retry-delay 2 --retry-all-errors \
+          story_status="$(curl --silent --show-error --retry 3 --retry-delay 2 --retry-all-errors \
+            --output "$RUNNER_TEMP/story.json" \
+            --write-out '%{http_code}' \
             -X POST "$base/api/story" \
             -H 'content-type: application/json' \
-            --data '{"prompt":"frog at the DMV"}' > "$RUNNER_TEMP/story.json"
+            --data '{"prompt":"frog at the DMV"}')"
+          if [[ "$story_status" != "200" ]]; then
+            echo "Story endpoint failed with HTTP $story_status:"
+            cat "$RUNNER_TEMP/story.json"
+            exit 1
+          fi
           jq -e '(.source | startswith("gemini-")) and (.scenes | length == 8)' "$RUNNER_TEMP/story.json" >/dev/null
+          echo "Gemini story endpoint passed."
 
-          curl --fail --silent --show-error --retry 3 --retry-delay 2 --retry-all-errors \
+          narrate_status="$(curl --silent --show-error --retry 3 --retry-delay 2 --retry-all-errors \
+            --output "$RUNNER_TEMP/narrate.json" \
+            --write-out '%{http_code}' \
             -X POST "$base/api/narrate" \
             -H 'content-type: application/json' \
-            --data '{"text":"Testing the Brainrot narrator."}' > "$RUNNER_TEMP/narrate.json"
+            --data '{"text":"Testing the Brainrot narrator."}')"
+          if [[ "$narrate_status" != "200" ]]; then
+            echo "Narration endpoint failed with HTTP $narrate_status:"
+            cat "$RUNNER_TEMP/narrate.json"
+            exit 1
+          fi
           jq -e '(.source | startswith("gemini-")) and (.sampleRate == 24000) and (.pcmBase64 | length > 1000)' "$RUNNER_TEMP/narrate.json" >/dev/null
+          echo "Gemini narration endpoint passed."
 
           echo "Cloudflare production smoke test passed: page, trends, Gemini story, and Gemini narration."
