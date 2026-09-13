@@ -187,7 +187,12 @@ async function requestSceneImage(scene, sceneIndex, visualStyle, prompt) {
     method: 'POST',
     headers: { 'content-type': 'application/json', accept: 'application/json' },
     body: JSON.stringify({
-      visualPrompt: scene.visualPrompt,
+      visualPrompt: [
+        scene.visualPrompt,
+        sceneIndex > 0
+          ? 'Continue the immediately previous story beat: preserve the same recurring subject identity, appearance, world, props, lighting logic, and screen direction while advancing only the described action.'
+          : 'Establish the recurring subject, world, props, lighting logic, and screen direction clearly so following beats can continue from it.',
+      ].join(' '),
       style: visualStyle,
       seed: seedFromString(`${prompt}:${sceneIndex}:${scene.subject}:${scene.setting}`),
     }),
@@ -334,7 +339,7 @@ async function generate(promptValue) {
   state.timeline = buildSceneTimeline(scenes, TARGET_SECONDS);
   state.microTimeline = buildMicroShotTimeline(state.timeline, visualStyle);
   scriptWordsEl.textContent = storyWordCount(scenes);
-  sceneCountEl.textContent = scenes.length;
+  sceneCountEl.textContent = state.microTimeline.length;
   videoLengthEl.textContent = '60s';
   setSources();
   drawFrame(0);
@@ -365,7 +370,7 @@ async function generate(promptValue) {
   } else if (readyImages > 0) {
     setStatus(`Ready. ${readyImages}/8 AI keyframes are live; 32 linked motion shots still cover the full minute.`, 'ok');
   } else {
-    setStatus('Ready. Image AI was unavailable, so every scene uses the story-matched cinematic fallback.', 'warn');
+    setStatus('Ready. Image AI was unavailable, so all 32 linked shots use the story-matched cinematic fallback.', 'warn');
   }
 }
 
@@ -860,7 +865,7 @@ downloadBtn.addEventListener('click', () => play({ record: true }));
 chaosSelect.addEventListener('change', () => { if (!state.playing && state.story) drawFrame(0); });
 visualStyleSelect.addEventListener('change', () => {
   state.visualStyle = normalizeVisualStyle(visualStyleSelect.value);
-  if (state.story) setStatus('Visual style changed. Generate again to rebuild all eight scene images in this style.', 'warn');
+  if (state.story) setStatus('Visual style changed. Generate again to rebuild all 32 linked shots in this style.', 'warn');
 });
 
 window.addEventListener('beforeunload', () => stopPlayback(false));
