@@ -35,9 +35,17 @@ const storySourceEl = document.getElementById('storySource');
 const voiceSourceEl = document.getElementById('voiceSource');
 const visualSourceEl = document.getElementById('visualSource');
 const trendSourcePill = document.getElementById('trendSourcePill');
-const playBtn = document.getElementById('playBtn');
-const replayBtn = document.getElementById('replayBtn');
-const stopBtn = document.getElementById('stopBtn');
+const createView = document.getElementById('createView');
+const cookingView = document.getElementById('cookingView');
+const resultView = document.getElementById('resultView');
+const loadingGallery = document.getElementById('loadingGallery');
+const loadingProgress = document.getElementById('loadingProgress');
+const resultTitle = document.getElementById('resultTitle');
+const resultStyle = document.getElementById('resultStyle');
+const playPauseBtn = document.getElementById('playPauseBtn');
+const repeatBtn = document.getElementById('repeatBtn');
+const nextTrendBtn = document.getElementById('nextTrendBtn');
+const homeBtn = document.getElementById('homeBtn');
 const downloadBtn = document.getElementById('downloadBtn');
 const downloadNote = document.getElementById('downloadNote');
 const scriptWordsEl = document.getElementById('scriptWords');
@@ -68,12 +76,63 @@ const state = {
   recording: false,
   recordingAborted: false,
   playing: false,
+  paused: false,
+  pauseStartedAt: 0,
+  currentView: 'create',
   startedAt: 0,
   raf: 0,
   stopTimer: 0,
   speechWordIndex: null,
   generateToken: 0,
 };
+
+function setView(view) {
+  const views = { create: createView, cooking: cookingView, result: resultView };
+  const next = views[view] || createView;
+  Object.entries(views).forEach(([name, element]) => {
+    element.hidden = element !== next;
+    element.setAttribute('aria-hidden', element === next ? 'false' : 'true');
+    if (element === next) state.currentView = name;
+  });
+  window.scrollTo({ top: 0, behavior: 'auto' });
+}
+
+function resetLoadingGallery() {
+  [...loadingGallery.children].forEach((tile, index) => {
+    tile.classList.remove('loaded');
+    tile.style.backgroundImage = '';
+    const label = tile.querySelector('span');
+    if (label) label.textContent = `BEAT ${index + 1}`;
+  });
+  loadingProgress.textContent = 'Writing the story and planning 32 linked shots.';
+}
+
+function updateLoadingGallery(results, completed, total) {
+  results.forEach((image, index) => {
+    const tile = loadingGallery.children[index];
+    if (!tile || !image?.src) return;
+    tile.style.backgroundImage = `linear-gradient(rgba(0,0,0,.08), rgba(0,0,0,.2)), url("${image.src}")`;
+    tile.classList.add('loaded');
+    const label = tile.querySelector('span');
+    if (label) label.textContent = `BEAT ${index + 1} ✓`;
+  });
+  const ready = results.filter(Boolean).length;
+  loadingProgress.textContent = `${completed}/${total} keyframes processed · ${ready} ready · 32 linked shots planned`;
+}
+
+function nextTrendPrompt() {
+  const current = state.story?.prompt || promptInput.value;
+  const options = state.trends.filter(trend => !current.toLowerCase().includes(String(trend).toLowerCase()));
+  const trend = options[0] || state.trends[0] || FALLBACK_TRENDS[0];
+  return trendToPrompt(trend);
+}
+
+function generateNextTrend() {
+  const prompt = nextTrendPrompt();
+  promptInput.value = prompt;
+  updateWordMeter();
+  generate(prompt);
+}
 
 function setStatus(message, kind = 'ok') {
   statusText.textContent = message;
@@ -228,6 +287,7 @@ async function generateSceneImages(token) {
         const ready = results.filter(Boolean).length;
         state.sceneImages = [...results];
         state.visualSource = ready ? `${firstSource || 'Workers AI'} · ${ready}/${scenes.length}` : 'cinematic fallback';
+        updateLoadingGallery(results, completed, scenes.length);
         setSources();
         drawFrame(0);
         setStatus(`Visualizing story scenes… ${completed}/${scenes.length}`, 'busy');
@@ -285,16 +345,18 @@ function canRecordNarratedVideo() {
 
 function updatePlaybackControls() {
   const ready = Boolean(state.story);
-  playBtn.disabled = !ready || state.playing;
-  replayBtn.disabled = !ready || state.playing;
-  stopBtn.disabled = !state.playing;
-  downloadBtn.disabled = !ready || state.playing || !canRecordNarratedVideo();
+  playPauseBtn.disabled = !ready || state.recording;
+  repeatBtn.disabled = !ready || state.recording;
+  nextTrendBtn.disabled = state.recording;
+  homeBtn.disabled = state.recording;
+  downloadBtn.disabled = !ready || state.playing || state.paused || !canRecordNarratedVideo();
+  playPauseBtn.textContent = state.paused ? '▶ RESUME' : state.playing ? '❚❚ PAUSE' : '▶ PLAY';
   if (canRecordNarratedVideo()) {
-    downloadNote.textContent = 'VIDEO records the full 60-second story-synced canvas + AI narration as WebM on this device.';
+    downloadNote.textContent = 'Download records the full 60-second 720×1280 canvas + AI narration as WebM on this device.';
   } else if (ready) {
     downloadNote.textContent = 'Preview works now. Narrated video export requires Gemini TTS plus browser MediaRecorder support.';
   } else {
-    downloadNote.textContent = 'Generate a rot first. AI scene images are composited into the same canvas used for export.';
+    downloadNote.textContent = 'Your full-resolution canvas stays export quality while the preview scales to fit this screen.';
   }
 }
 
@@ -308,6 +370,8 @@ async function generate(promptValue) {
   const token = ++state.generateToken;
   const visualStyle = normalizeVisualStyle(visualStyleSelect.value);
   stopPlayback(true);
+  resetLoadingGallery();
+  setView('cooking');
   setGenerating(true);
   state.audioBuffer = null;
   state.story = null;
@@ -362,8 +426,11 @@ async function generate(promptValue) {
   if (token !== state.generateToken) return;
   const readyImages = visualResult.status === 'fulfilled' ? visualResult.value : 0;
   drawFrame(0);
+  resultTitle.textContent = validation.prompt;
+  resultStyle.textContent = getVisualStylePreset(visualStyle).label;
   setGenerating(false);
   updateWordMeter();
+  setView('result');
   updatePlaybackControls();
   if (readyImages === scenes.length) {
     setStatus('Ready. Eight AI keyframes drive 32 linked motion shots plus narration.', 'ok');
@@ -445,6 +512,10 @@ function startDeviceSpeech() {
 }
 
 async function play({ record = false } = {}) {
+  if (state.paused && !record) {
+    await resumePlayback();
+    return;
+  }
   if (!state.story || state.playing) return;
   if (record && !canRecordNarratedVideo()) {
     setStatus('Narrated recording is unavailable in this mode/browser. Preview still works.', 'warn');
@@ -452,6 +523,7 @@ async function play({ record = false } = {}) {
   }
   stopPlayback(true);
   state.playing = true;
+  state.paused = false;
   state.recording = record;
   state.speechWordIndex = null;
   state.startedAt = performance.now();
@@ -480,9 +552,51 @@ async function play({ record = false } = {}) {
   state.stopTimer = window.setTimeout(finishPlayback, TARGET_SECONDS * 1000 + 120);
 }
 
+async function pausePlayback() {
+  if (!state.playing || state.recording) return;
+  state.playing = false;
+  state.paused = true;
+  state.pauseStartedAt = performance.now();
+  if (state.raf) cancelAnimationFrame(state.raf);
+  state.raf = 0;
+  if (state.stopTimer) clearTimeout(state.stopTimer);
+  state.stopTimer = 0;
+  if (state.audioBuffer && state.audioContext?.state === 'running') {
+    await state.audioContext.suspend();
+  } else if ('speechSynthesis' in window) {
+    window.speechSynthesis.pause();
+  }
+  updatePlaybackControls();
+}
+
+async function resumePlayback() {
+  if (!state.paused || !state.story) return;
+  const now = performance.now();
+  state.startedAt += now - state.pauseStartedAt;
+  state.pauseStartedAt = 0;
+  state.paused = false;
+  state.playing = true;
+  if (state.audioBuffer && state.audioContext?.state === 'suspended') {
+    await state.audioContext.resume();
+  } else if ('speechSynthesis' in window) {
+    window.speechSynthesis.resume();
+  }
+  const elapsed = Math.min(TARGET_SECONDS, Math.max(0, (now - state.startedAt) / 1000));
+  state.raf = requestAnimationFrame(renderPlayback);
+  state.stopTimer = window.setTimeout(finishPlayback, Math.max(0, TARGET_SECONDS - elapsed) * 1000 + 120);
+  updatePlaybackControls();
+}
+
+function repeatPlayback() {
+  stopPlayback(true);
+  play({ record: false });
+}
+
 function finishPlayback() {
   if (!state.playing && !state.recording) return;
   state.playing = false;
+  state.paused = false;
+  state.pauseStartedAt = 0;
   if (state.raf) cancelAnimationFrame(state.raf);
   state.raf = 0;
   if (state.stopTimer) clearTimeout(state.stopTimer);
@@ -511,6 +625,8 @@ function stopPlayback(resetCanvas = false) {
     state.recorder.stop();
   }
   state.playing = false;
+  state.paused = false;
+  state.pauseStartedAt = 0;
   state.recording = false;
   state.speechWordIndex = null;
   if (resetCanvas && state.story) drawFrame(0);
@@ -855,13 +971,18 @@ quickBtn.addEventListener('click', () => {
   updateWordMeter();
   generate(prompt);
 });
-playBtn.addEventListener('click', () => play({ record: false }));
-replayBtn.addEventListener('click', () => play({ record: false }));
-stopBtn.addEventListener('click', () => {
-  stopPlayback(false);
-  setStatus('Stopped. The brain cells have been temporarily preserved.', 'warn');
+playPauseBtn.addEventListener('click', () => {
+  if (state.playing) pausePlayback();
+  else play({ record: false });
 });
+repeatBtn.addEventListener('click', repeatPlayback);
 downloadBtn.addEventListener('click', () => play({ record: true }));
+nextTrendBtn.addEventListener('click', generateNextTrend);
+homeBtn.addEventListener('click', () => {
+  stopPlayback(true);
+  setView('create');
+  promptInput.focus();
+});
 chaosSelect.addEventListener('change', () => { if (!state.playing && state.story) drawFrame(0); });
 visualStyleSelect.addEventListener('change', () => {
   state.visualStyle = normalizeVisualStyle(visualStyleSelect.value);
@@ -871,6 +992,8 @@ visualStyleSelect.addEventListener('change', () => {
 window.addEventListener('beforeunload', () => stopPlayback(false));
 window.setInterval(rotateTrendRail, 12_000);
 
+setView('create');
+resetLoadingGallery();
 updateWordMeter();
 setSources();
 updatePlaybackControls();
