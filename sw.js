@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rot-machine-shell-v3';
+const CACHE_NAME = 'rot-machine-shell-v4';
 const SCOPE_URL = new URL('./', self.location.href);
 const APP_SHELL = [
   './',

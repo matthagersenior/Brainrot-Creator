@@ -372,6 +372,24 @@ function sceneVisualPrompt(scene, sceneIndex) {
   ].join(' ');
 }
 
+function buildQualityFallbackPrompt(scene, visualStyle) {
+  const stylePrompt = getVisualStylePreset(visualStyle).prompt;
+  return [
+    stylePrompt,
+    `one clear recurring protagonist: ${scene.subject}`,
+    `literal physical location: ${scene.setting}`,
+    `visible physical action: ${scene.action}`,
+    `camera framing: ${scene.camera}`,
+    'vertical 9:16 social-video frame',
+    'the main subject must be clearly recognizable and occupy roughly 35 to 60 percent of the frame',
+    'show people, objects, architecture, landscape, and physical action literally',
+    'do not visualize abstract words or concepts such as aura, rizz, energy, gravity, loop, lore, or side quest as symbols, text, fog, blobs, or typography',
+    'if signs, screens, labels, paperwork, or displays are visible, keep their writing blank, tiny, defocused, or unreadable',
+    'no letters, words, captions, subtitles, logos, watermarks, UI, title cards, posters, or speech bubbles',
+    'sharp focal subject, usable photographic detail, clear foreground and background separation',
+  ].join('. ');
+}
+
 function blobToDataURI(blob) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -381,15 +399,90 @@ function blobToDataURI(blob) {
   });
 }
 
+function inspectImageQuality(image) {
+  const sample = document.createElement('canvas');
+  sample.width = 48;
+  sample.height = 84;
+  const sampleCtx = sample.getContext('2d', { willReadFrequently: true });
+  if (!sampleCtx) return { ok: true, reason: 'quality sampler unavailable' };
+
+  sampleCtx.drawImage(image, 0, 0, sample.width, sample.height);
+  const { data } = sampleCtx.getImageData(0, 0, sample.width, sample.height);
+  const luminance = new Float32Array(sample.width * sample.height);
+  let mean = 0;
+  let dark = 0;
+  let bright = 0;
+  let chromaTotal = 0;
+
+  for (let i = 0, p = 0; i < data.length; i += 4, p += 1) {
+    const red = data[i];
+    const green = data[i + 1];
+    const blue = data[i + 2];
+    const value = red * 0.2126 + green * 0.7152 + blue * 0.0722;
+    luminance[p] = value;
+    mean += value;
+    chromaTotal += (Math.max(red, green, blue) - Math.min(red, green, blue)) / 255;
+    if (value < 18) dark += 1;
+    if (value > 240) bright += 1;
+  }
+
+  mean /= luminance.length;
+  let variance = 0;
+  let edgeHits = 0;
+  let edgeChecks = 0;
+  for (let y = 0; y < sample.height; y += 1) {
+    for (let x = 0; x < sample.width; x += 1) {
+      const index = y * sample.width + x;
+      const value = luminance[index];
+      variance += (value - mean) ** 2;
+      if (x + 1 < sample.width) {
+        edgeChecks += 1;
+        if (Math.abs(value - luminance[index + 1]) > 18) edgeHits += 1;
+      }
+      if (y + 1 < sample.height) {
+        edgeChecks += 1;
+        if (Math.abs(value - luminance[index + sample.width]) > 18) edgeHits += 1;
+      }
+    }
+  }
+
+  const stddev = Math.sqrt(variance / luminance.length);
+  const edgeDensity = edgeChecks ? edgeHits / edgeChecks : 0;
+  const darkRatio = dark / luminance.length;
+  const brightRatio = bright / luminance.length;
+  const chromaMean = chromaTotal / luminance.length;
+  const graphicTextLike = chromaMean < 0.09
+    && (darkRatio + brightRatio) > 0.52
+    && edgeDensity > 0.065;
+  const ok = stddev >= 22
+    && edgeDensity >= 0.025
+    && darkRatio < 0.82
+    && brightRatio < 0.82
+    && !graphicTextLike;
+  return {
+    ok,
+    reason: graphicTextLike
+      ? `graphic/text-like frame, chroma ${chromaMean.toFixed(2)}, edges ${(edgeDensity * 100).toFixed(1)}%`
+      : `detail std ${stddev.toFixed(1)}, edges ${(edgeDensity * 100).toFixed(1)}%`,
+  };
+}
+
+async function loadQualityImage(dataURI, providerLabel) {
+  const image = await loadImage(dataURI);
+  const quality = inspectImageQuality(image);
+  if (!quality.ok) throw new Error(`${providerLabel} rejected low-detail frame (${quality.reason})`);
+  return image;
+}
+
 async function localizePuterImage(candidate) {
   const src = typeof candidate === 'string' ? candidate : candidate?.src;
   if (!src) throw new Error('Puter returned no image source');
-  if (src.startsWith('data:')) return loadImage(src);
+  if (src.startsWith('data:')) return loadQualityImage(src, 'Puter');
   const response = await fetch(src, { mode: 'cors' });
   if (!response.ok) throw new Error(`Puter image download ${response.status}`);
   const blob = await response.blob();
   const dataURI = await blobToDataURI(blob);
-  return loadImage(dataURI);
+  return loadQualityImage(dataURI, 'Puter');
 }
 
 async function requestPuterSceneImage(visualPrompt) {
@@ -413,6 +506,23 @@ async function requestPuterSceneImage(visualPrompt) {
   throw lastError;
 }
 
+async function requestPollinationsSceneImage(visualPrompt, seed, model) {
+  const response = await fetch('/api/pollinations-image', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify({ visualPrompt, seed, model }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data?.dataURI) {
+    const detail = data?.detail || data?.error || `HTTP ${response.status}`;
+    throw new Error(`Pollinations ${model} ${detail}`);
+  }
+  return {
+    image: await loadQualityImage(data.dataURI, `Pollinations ${model}`),
+    source: data.source || `Pollinations · ${model}`,
+  };
+}
+
 async function requestHordeSceneImage(visualPrompt, seed) {
   const response = await fetch('/api/horde-image', {
     method: 'POST',
@@ -426,53 +536,63 @@ async function requestHordeSceneImage(visualPrompt, seed) {
   }
   if (!data?.dataURI) throw new Error('AI Horde empty image');
   return {
-    image: await loadImage(data.dataURI),
+    image: await loadQualityImage(data.dataURI, 'AI Horde'),
     source: data.source || 'AI Horde · anonymous community',
   };
 }
 
 async function requestSceneImage(scene, sceneIndex, visualStyle, prompt) {
   const visualPrompt = sceneVisualPrompt(scene, sceneIndex);
-  const seed = seedFromString(`${prompt}:${sceneIndex}:${scene.subject}:${scene.setting}`);
+  const sceneSeed = seedFromString(`${prompt}:${sceneIndex}:${scene.subject}:${scene.setting}`);
+  const continuitySeed = seedFromString(`${prompt}:${scene.subject}:${visualStyle}:recurring-protagonist`);
   const failures = [];
 
   try {
     const response = await fetch('/api/visualize', {
       method: 'POST',
       headers: { 'content-type': 'application/json', accept: 'application/json' },
-      body: JSON.stringify({ visualPrompt, style: visualStyle, seed }),
+      body: JSON.stringify({ visualPrompt, style: visualStyle, seed: sceneSeed }),
     });
     const data = await response.json().catch(() => ({}));
     if (response.ok && data?.dataURI) {
-      return { image: await loadImage(data.dataURI), source: data.source || 'Cloudflare Workers AI' };
+      return {
+        image: await loadQualityImage(data.dataURI, 'Cloudflare'),
+        source: data.source || 'Cloudflare Workers AI',
+      };
     }
     failures.push(`Cloudflare ${response.status}`);
-  } catch {
-    failures.push('Cloudflare unavailable');
+  } catch (error) {
+    failures.push(String(error?.message || 'Cloudflare unavailable').slice(0, 100));
   }
 
-  const stylePrompt = getVisualStylePreset(visualStyle).prompt;
-  const fallbackPrompt = [
-    stylePrompt,
-    visualPrompt,
-    'vertical 9:16 social-video composition',
-    'no text, subtitles, logos, watermarks, UI, or speech bubbles',
-  ].join('. ');
+  // In fallback mode, create four stronger anchor images and reuse them for
+  // neighboring scenes. This preserves continuity and avoids eight low-quality
+  // anonymous generations competing for free capacity.
+  if (sceneIndex % 2 === 1) {
+    throw new Error(`${failures.join(' → ')} → scheduled nearest-anchor reuse`);
+  }
 
-  // AI Horde supports anonymous, no-login generation. Generate four anchor frames,
-  // then reuse the nearest successful anchor for the in-between beats.
-  if (sceneIndex % 2 === 0) {
+  const fallbackPrompt = buildQualityFallbackPrompt(scene, visualStyle);
+
+  for (const model of ['flux', 'zimage']) {
     try {
-      return await requestHordeSceneImage(fallbackPrompt, seed);
+      return await requestPollinationsSceneImage(fallbackPrompt, continuitySeed, model);
     } catch (error) {
-      failures.push(String(error?.message || 'AI Horde failed').slice(0, 80));
+      failures.push(String(error?.message || `Pollinations ${model} failed`).slice(0, 110));
     }
   }
 
   try {
     return await requestPuterSceneImage(fallbackPrompt);
   } catch (error) {
-    failures.push(String(error?.message || 'Puter failed').slice(0, 80));
+    failures.push(String(error?.message || 'Puter failed').slice(0, 100));
+  }
+
+  // Emergency-only. AI Horde is intentionally behind the quality providers.
+  try {
+    return await requestHordeSceneImage(fallbackPrompt, continuitySeed);
+  } catch (error) {
+    failures.push(String(error?.message || 'AI Horde failed').slice(0, 100));
   }
 
   throw new Error(failures.join(' → '));
@@ -522,7 +642,7 @@ async function generateSceneImages(token) {
         sources[index] = result.source;
       } catch (error) {
         results[index] = null;
-        errors[index] = String(error?.message || error || 'image fallback failed').slice(0, 180);
+        errors[index] = String(error?.message || error || 'image fallback failed').slice(0, 220);
       }
       completed += 1;
       if (token === state.generateToken) {
@@ -531,7 +651,11 @@ async function generateSceneImages(token) {
         state.visualGeneratedCount = ready;
         state.visualCoveredCount = ready;
         state.visualErrors = [...errors];
-        state.visualSource = ready ? summarizeVisualSources(sources, 0, errors) : completed < scenes.length ? 'trying anonymous image fallback…' : summarizeVisualSources(sources, 0, errors);
+        state.visualSource = ready
+          ? summarizeVisualSources(sources, 0, errors)
+          : completed < scenes.length
+            ? 'trying quality image fallback…'
+            : summarizeVisualSources(sources, 0, errors);
         updateLoadingGallery(results, completed, scenes.length);
         setSources();
         drawFrame(0);

@@ -92,7 +92,7 @@ test('client sends story style and mood arc to TTS and labels story-matched voic
   assert.match(app, /story-matched/);
 });
 
-test('free-first fallback chain tries Cloudflare, anonymous AI Horde, then documented Puter providers and keeps device speech last', async () => {
+test('free-first fallback chain prioritizes quality providers before emergency Horde and keeps device speech last', async () => {
   const html = await readFile(new URL('index.html', root), 'utf8');
   const app = await readFile(new URL('app.mjs', root), 'utf8');
 
@@ -102,11 +102,12 @@ test('free-first fallback chain tries Cloudflare, anonymous AI Horde, then docum
 
   const sceneChain = app.slice(app.indexOf('async function requestSceneImage'), app.indexOf('function summarizeVisualSources'));
   const cloudflare = sceneChain.indexOf('/api/visualize');
-  const horde = sceneChain.indexOf('requestHordeSceneImage');
+  const pollinations = sceneChain.indexOf('requestPollinationsSceneImage');
   const puter = sceneChain.indexOf('requestPuterSceneImage');
+  const horde = sceneChain.indexOf('requestHordeSceneImage');
   const flux = app.indexOf('black-forest-labs/flux-schnell');
   const leonardo = app.indexOf('leonardoai/lucid-origin');
-  assert.ok(cloudflare >= 0 && horde > cloudflare && puter > horde);
+  assert.ok(cloudflare >= 0 && pollinations > cloudflare && puter > pollinations && horde > puter);
   assert.ok(flux >= 0 && leonardo >= 0);
   assert.match(app, /replicate-image-generation/);
   assert.match(app, /Puter signed out/);
@@ -117,4 +118,22 @@ test('free-first fallback chain tries Cloudflare, anonymous AI Horde, then docum
   assert.match(app, /txt2speech/);
   assert.match(app, /device speechSynthesis/);
   assert.match(app, /nearest generated imagery/);
+});
+
+test('quality-first image fallback uses Pollinations ahead of emergency Horde and rejects low-detail frames', async () => {
+  const app = await readFile(new URL('app.mjs', root), 'utf8');
+
+  const chain = app.slice(app.indexOf('async function requestSceneImage'), app.indexOf('function summarizeVisualSources'));
+  const cloudflare = chain.indexOf('/api/visualize');
+  const pollinations = chain.indexOf('requestPollinationsSceneImage');
+  const puter = chain.indexOf('requestPuterSceneImage');
+  const horde = chain.indexOf('requestHordeSceneImage');
+
+  assert.ok(cloudflare >= 0 && pollinations > cloudflare && puter > pollinations && horde > puter);
+  assert.match(app, /for \(const model of \['flux', 'zimage'\]\)/);
+  assert.match(app, /inspectImageQuality/);
+  assert.match(app, /rejected low-detail frame/);
+  assert.match(app, /graphic\/text-like frame/);
+  assert.match(app, /scheduled nearest-anchor reuse/);
+  assert.match(app, /do not visualize abstract words or concepts/);
 });

@@ -182,8 +182,20 @@ jobs:
             echo "Workers AI scene visual endpoint passed with a real image payload."
           elif [[ "$visual_status" == "502" ]] \
             && jq -e '(.error == "VISUAL_AI_FAILED") and (.detail | test("daily free allocation|used up.*neurons"; "i"))' "$RUNNER_TEMP/visual.json" >/dev/null; then
-            echo "::warning::Cloudflare Workers AI free daily allocation is exhausted. The deployed app will use its built-in visual fallback until the free allocation resets."
-            echo "Workers AI quota-exhaustion fallback contract passed."
+            echo "::warning::Cloudflare Workers AI free daily allocation is exhausted. Verifying the production quality fallback."
+            fallback_status="$(curl --silent --show-error --max-time 70 \
+              --output "$RUNNER_TEMP/fallback-visual.json" \
+              --write-out '%{http_code}' \
+              -X POST "$base/api/pollinations-image" \
+              -H 'content-type: application/json' \
+              --data '{"visualPrompt":"photorealistic young traveler lost in an Ohio cornfield at dusk, holding a phone GPS, clear human subject, realistic landscape, vertical 9:16, no text, no logos, no signs","model":"flux","seed":42}')"
+            if [[ "$fallback_status" != "200" ]]; then
+              echo "Pollinations quality fallback failed with HTTP $fallback_status:"
+              cat "$RUNNER_TEMP/fallback-visual.json"
+              exit 1
+            fi
+            jq -e '(.source | startswith("Pollinations")) and (.dataURI | startswith("data:image/")) and (.dataURI | length > 10000)' "$RUNNER_TEMP/fallback-visual.json" >/dev/null
+            echo "Workers AI quota-exhaustion fallback passed with a real Pollinations image payload."
           else
             echo "Workers AI scene visual endpoint failed unexpectedly with HTTP $visual_status:"
             cat "$RUNNER_TEMP/visual.json"
