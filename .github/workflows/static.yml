@@ -186,9 +186,9 @@ jobs:
             fallback_status="$(curl --silent --show-error --max-time 70 \
               --output "$RUNNER_TEMP/fallback-visual.json" \
               --write-out '%{http_code}' \
-              -X POST "$base/api/pollinations-image" \
+              -X POST "$base/api/horde-image" \
               -H 'content-type: application/json' \
-              --data '{"visualPrompt":"photorealistic young traveler lost in an Ohio cornfield at dusk, holding a phone GPS, clear human subject, realistic landscape, vertical 9:16, no text, no logos, no signs","model":"flux","seed":42}')"
+              --data '{"provider":"pollinations","visualPrompt":"photorealistic young traveler lost in an Ohio cornfield at dusk, holding a phone GPS, clear human subject, realistic landscape, vertical 9:16, no text, no logos, no signs","model":"flux","seed":42}')"
             if [[ "$fallback_status" != "200" ]]; then
               echo "Pollinations quality fallback failed with HTTP $fallback_status:"
               cat "$RUNNER_TEMP/fallback-visual.json"

@@ -32,7 +32,7 @@ test('production visual smoke check requires real FLUX output unless the free da
   assert.match(workflow, /if \[\[ "\$visual_status" == "200" \]\]; then/);
   assert.match(workflow, /data:image\/jpeg;base64,/);
   assert.match(workflow, /daily free allocation/);
-  assert.match(workflow, /api\/pollinations-image/);
+  assert.match(workflow, /api\/horde-image/);
   assert.match(workflow, /Pollinations quality fallback failed/);
   assert.match(workflow, /fallback passed with a real Pollinations image payload/);
   assert.match(workflow, /failed unexpectedly with HTTP/);

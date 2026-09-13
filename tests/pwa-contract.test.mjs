@@ -71,6 +71,6 @@ test('Cloudflare production bundle includes and verifies the PWA assets', async 
   assert.match(workflow, /icons\/icon-192\.png icons\/icon-512\.png/);
   assert.match(workflow, /PWA manifest and service worker passed/);
   assert.match(workflow, /daily free allocation/);
-  assert.match(workflow, /api\/pollinations-image/);
+  assert.match(workflow, /api\/horde-image/);
   assert.match(workflow, /fallback passed with a real Pollinations image payload/);
 });
