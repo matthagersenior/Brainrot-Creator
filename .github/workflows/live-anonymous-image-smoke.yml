@@ -1,19 +1,23 @@
-name: Verify live quality image broker
+name: Inspect Cloudflare Pages production routing
 
 on:
   push:
     branches: ["verify/live-anonymous-image"]
 
 jobs:
-  verify-live-quality-broker:
+  inspect-pages-project:
     runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      PROJECT: brainrot-creator
     steps:
-      - name: Inspect production Pollinations broker response
+      - name: Inspect project and latest deployments
         shell: bash
         run: |
-          set -u
-          base="https://brainrot-creator.pages.dev"
-          status="$(curl --silent --show-error --max-time 70             --output "$RUNNER_TEMP/fallback.json"             --write-out '%{http_code}'             -X POST "$base/api/horde-image"             -H 'content-type: application/json'             --data '{"provider":"pollinations","visualPrompt":"photorealistic young traveler lost in an Ohio cornfield at dusk, holding a phone GPS, clear human subject, realistic landscape, vertical 9:16, no text, no logos, no signs","model":"flux","seed":42}')"
-          echo "HTTP $status"
-          cat "$RUNNER_TEMP/fallback.json" | jq '{source,model,error,detail,bytes,dataLength:(.dataURI // "" | length),prefix:(.dataURI // "" | .[0:40])}'
-          test "$status" = "200"
+          set -euo pipefail
+          curl --fail --silent --show-error             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PROJECT"             > "$RUNNER_TEMP/project.json"
+          jq '{production_branch:.result.production_branch,subdomain:.result.subdomain,source:.result.source}' "$RUNNER_TEMP/project.json"
+
+          curl --fail --silent --show-error             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PROJECT/deployments?per_page=10"             > "$RUNNER_TEMP/deployments.json"
+          jq '[.result[] | {id,environment,url,branch:.deployment_trigger.metadata.branch,commit_hash:.deployment_trigger.metadata.commit_hash,latest_stage:(.latest_stage.name // null),stage_status:(.latest_stage.status // null)}]' "$RUNNER_TEMP/deployments.json"
