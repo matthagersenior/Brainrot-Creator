@@ -21,16 +21,18 @@ test('creator is installable as a branded standalone PWA with offline app shell'
   assert.equal(manifest.name, 'ROT MACHINE — Brainrot Creator');
   assert.equal(manifest.short_name, 'ROT MACHINE');
   assert.equal(manifest.display, 'standalone');
-  assert.equal(manifest.start_url, '/');
-  assert.equal(manifest.id, '/');
+  assert.equal(manifest.start_url, './');
+  assert.equal(manifest.id, './');
+  assert.equal(manifest.scope, './');
   assert.equal(manifest.orientation, 'portrait-primary');
-  assert.ok(manifest.icons.some(icon => icon.sizes === '192x192'));
-  assert.ok(manifest.icons.some(icon => icon.sizes === '512x512'));
+  assert.ok(manifest.icons.some(icon => icon.sizes === '192x192' && icon.src.startsWith('./')));
+  assert.ok(manifest.icons.some(icon => icon.sizes === '512x512' && icon.src.startsWith('./')));
   assert.ok(manifest.icons.some(icon => String(icon.purpose || '').includes('maskable')));
 
   assert.match(worker, /addEventListener\(['"]install['"]/);
   assert.match(worker, /addEventListener\(['"]fetch['"]/);
-  assert.match(worker, /index\.html/);
+  assert.match(worker, /SCOPE_URL/);
+  assert.match(worker, /OFFLINE_FALLBACK/);
   assert.match(app, /serviceWorker\.register/);
   assert.match(app, /beforeinstallprompt/);
   assert.match(app, /installBtn/);
@@ -47,7 +49,6 @@ test('polished app shell exposes install affordance and automatic voice-cast sta
   assert.match(css, /\.install-btn/);
   assert.match(css, /backdrop-filter/);
 });
-
 
 test('Cloudflare production bundle includes and verifies the PWA assets', async () => {
   const workflow = await readFile(new URL('.github/workflows/static.yml', root), 'utf8');
