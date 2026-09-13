@@ -100,11 +100,14 @@ test('free-first fallback chain tries Cloudflare, anonymous AI Horde, then docum
   assert.match(html, /id="resultVisualSource"/);
   assert.match(html, /id="resultVoiceSource"/);
 
-  const cloudflare = app.indexOf('/api/visualize');
-  const horde = app.indexOf('/api/horde-image');
+  const sceneChain = app.slice(app.indexOf('async function requestSceneImage'), app.indexOf('function summarizeVisualSources'));
+  const cloudflare = sceneChain.indexOf('/api/visualize');
+  const horde = sceneChain.indexOf('requestHordeSceneImage');
+  const puter = sceneChain.indexOf('requestPuterSceneImage');
   const flux = app.indexOf('black-forest-labs/flux-schnell');
   const leonardo = app.indexOf('leonardoai/lucid-origin');
-  assert.ok(cloudflare >= 0 && horde > cloudflare && flux >= 0 && leonardo >= 0);
+  assert.ok(cloudflare >= 0 && horde > cloudflare && puter > horde);
+  assert.ok(flux >= 0 && leonardo >= 0);
   assert.match(app, /replicate-image-generation/);
   assert.match(app, /Puter signed out/);
   assert.match(app, /txt2img/);
