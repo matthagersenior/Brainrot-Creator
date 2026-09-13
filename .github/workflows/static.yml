@@ -162,7 +162,7 @@ jobs:
           echo "Live page passed."
 
           curl --fail --silent --show-error "$base/manifest.webmanifest" > "$RUNNER_TEMP/manifest.json"
-          jq -e '(.display == "standalone") and (.start_url == "/") and (.icons | any(.sizes == "192x192")) and (.icons | any(.sizes == "512x512"))' "$RUNNER_TEMP/manifest.json" >/dev/null
+          jq -e '(.display == "standalone") and (.start_url == "./") and (.scope == "./") and (.icons | any(.sizes == "192x192")) and (.icons | any(.sizes == "512x512"))' "$RUNNER_TEMP/manifest.json" >/dev/null
           curl --fail --silent --show-error "$base/sw.js" | grep -q "CACHE_NAME"
           echo "PWA manifest and service worker passed."
 
