@@ -34,3 +34,13 @@ test('production smoke test requires a real FLUX image before slower Gemini chec
   assert.match(workflow, /data:image\/jpeg;base64,/);
   assert.doesNotMatch(workflow, /Workers AI binding is present but image generation is temporarily unavailable/);
 });
+
+
+test('production narration smoke check requires story-matched dual-voice metadata', async () => {
+  const workflow = await workflowText();
+  assert.match(workflow, /Your aura expired yesterday/);
+  assert.match(workflow, /"visualStyle":"cursed-real"/);
+  assert.match(workflow, /\.voiceMode == "dual"/);
+  assert.match(workflow, /\.narratorVoice == "Charon"/);
+  assert.match(workflow, /\.characterVoice == "Enceladus"/);
+});
