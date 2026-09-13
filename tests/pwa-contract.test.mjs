@@ -38,6 +38,21 @@ test('creator is installable as a branded standalone PWA with offline app shell'
   assert.match(app, /installBtn/);
 });
 
+test('PWA icon files exist as valid PNG assets at the declared sizes', async () => {
+  const [icon192, icon512] = await Promise.all([
+    readFile(new URL('icons/icon-192.png', root)),
+    readFile(new URL('icons/icon-512.png', root)),
+  ]);
+  const signature = '89504e470d0a1a0a';
+
+  assert.equal(icon192.subarray(0, 8).toString('hex'), signature);
+  assert.equal(icon192.readUInt32BE(16), 192);
+  assert.equal(icon192.readUInt32BE(20), 192);
+  assert.equal(icon512.subarray(0, 8).toString('hex'), signature);
+  assert.equal(icon512.readUInt32BE(16), 512);
+  assert.equal(icon512.readUInt32BE(20), 512);
+});
+
 test('polished app shell exposes install affordance and automatic voice-cast status', async () => {
   const html = await readFile(new URL('index.html', root), 'utf8');
   const css = await readFile(new URL('styles.css', root), 'utf8');
