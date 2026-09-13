@@ -1,28 +1,22 @@
-name: Inspect deployed Pages Worker bundle
+name: Verify direct Pollinations browser compatibility
 
 on:
   push:
     branches: ["verify/live-anonymous-image"]
 
 jobs:
-  inspect-worker:
+  inspect-pollinations:
     runs-on: ubuntu-latest
-    env:
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      SCRIPT: pages-worker--19137760-production
     steps:
-      - name: Inspect deployed production Worker script markers
+      - name: Check anonymous FLUX response headers and image
         shell: bash
         run: |
-          set -u
-          status="$(curl --silent --show-error             --output "$RUNNER_TEMP/worker.bin"             --write-out '%{http_code}'             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$SCRIPT")"
-          echo "Worker fetch HTTP $status"
-          echo "bytes=$(wc -c < "$RUNNER_TEMP/worker.bin")"
-          for marker in 'POLLINATIONS_BASE' 'pollinationsGenerate' 'provider ||' 'HORDE_TIMEOUT' 'AI Horde'; do
-            if grep -a -q "$marker" "$RUNNER_TEMP/worker.bin"; then
-              echo "FOUND: $marker"
-            else
-              echo "MISSING: $marker"
-            fi
-          done
+          set -euo pipefail
+          url='https://image.pollinations.ai/prompt/photorealistic%20young%20traveler%20lost%20in%20an%20Ohio%20cornfield%20at%20dusk%2C%20holding%20phone%20GPS%2C%20clear%20subject%2C%20vertical%209%3A16%2C%20no%20text?model=flux&width=576&height=1024&seed=42&enhance=true&safe=true&private=true&nologo=true'
+          status="$(curl --silent --show-error --max-time 70             -D "$RUNNER_TEMP/headers.txt"             -o "$RUNNER_TEMP/image.bin"             -w '%{http_code}' "$url")"
+          echo "HTTP $status"
+          grep -iE '^(content-type|content-length|access-control-allow-origin|cross-origin-resource-policy|cache-control):' "$RUNNER_TEMP/headers.txt" || true
+          echo "bytes=$(wc -c < "$RUNNER_TEMP/image.bin")"
+          file "$RUNNER_TEMP/image.bin"
+          test "$status" = "200"
+          test "$(wc -c < "$RUNNER_TEMP/image.bin")" -gt 10000
