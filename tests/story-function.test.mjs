@@ -61,6 +61,8 @@ test('story endpoint prefers Gemini 3.1 Flash-Lite and requires an eight-scene s
     assert.equal(body.source, 'gemini-3.1-flash-lite');
     assert.equal(body.scenes.length, 8);
     assert.equal(requestedBody.generationConfig.responseMimeType, 'application/json');
+    assert.match(requestedBody.contents[0].parts[0].text, /short direct quote/i);
+    assert.match(requestedBody.contents[0].parts[0].text, /same recurring featured character/i);
     assert.equal(requestedBody.generationConfig.responseJsonSchema.type, 'object');
     assert.deepEqual(requestedBody.generationConfig.responseJsonSchema.required, ['continuity', 'scenes']);
     assert.equal(requestedBody.generationConfig.responseJsonSchema.properties.scenes.minItems, 8);
