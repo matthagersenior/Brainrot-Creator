@@ -68,3 +68,16 @@ test('creator uses separate create, cooking, and result screens with final-playe
   assert.match(css, /100svh/);
   assert.match(css, /\.result-stage-shell/);
 });
+
+
+test('cooking screen uses story-blind chaos instead of revealing generated keyframes', async () => {
+  const app = await readFile(new URL('app.mjs', root), 'utf8');
+  const html = await readFile(new URL('index.html', root), 'utf8');
+
+  assert.match(app, /COOKING_CHAOS_LABELS/);
+  assert.match(app, /startCookingChaos/);
+  assert.match(app, /stopCookingChaos/);
+  assert.match(app, /renderCookingChaos/);
+  assert.doesNotMatch(app, /tile\.style\.backgroundImage\s*=\s*.*image\.src/);
+  assert.match(html, /aria-label="Story-blind Brainrot cooking animation"/);
+});
