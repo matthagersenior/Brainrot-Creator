@@ -20,6 +20,17 @@ const FALLBACK_TRENDS = [
   'streamer speedrun', 'mystery mascot', 'football celebration', 'movie trailer reaction', 'AI pet', 'retro game remake',
 ];
 
+const PUTER_IMAGE_MODELS = Object.freeze([
+  Object.freeze({ model: 'rundiffusion/juggernaut-lightning-flux', label: 'Puter · Juggernaut Lightning FLUX' }),
+  Object.freeze({ model: 'stabilityai/stable-diffusion-3-medium', label: 'Puter · Stable Diffusion 3' }),
+  Object.freeze({ model: 'leonardoai/lucid-origin', label: 'Puter · Leonardo Lucid Origin' }),
+]);
+
+const PUTER_TTS_FALLBACKS = Object.freeze([
+  Object.freeze({ options: { provider: 'openai', model: 'tts-1-hd', voice: 'nova' }, label: 'Puter · OpenAI HD voice' }),
+  Object.freeze({ options: { voice: 'Joanna', engine: 'neural' }, label: 'Puter · neural voice' }),
+]);
+
 const COOKING_CHAOS_LABELS = [
   'AURA OVERCLOCKED', 'LORE BUFFERING', 'RIZZ COMPILING', 'MEME PARTICLES',
   'REALITY LAGGING', 'BRAINcells OFFLINE', 'PIXELS FERMENTING', 'CHAOS VERIFIED',
@@ -53,6 +64,8 @@ const storySourceEl = document.getElementById('storySource');
 const voiceSourceEl = document.getElementById('voiceSource');
 const visualSourceEl = document.getElementById('visualSource');
 const trendSourcePill = document.getElementById('trendSourcePill');
+const resultVisualSourceEl = document.getElementById('resultVisualSource');
+const resultVoiceSourceEl = document.getElementById('resultVoiceSource');
 const createView = document.getElementById('createView');
 const cookingView = document.getElementById('cookingView');
 const resultView = document.getElementById('resultView');
@@ -82,8 +95,10 @@ const state = {
   timeline: [],
   microTimeline: [],
   storySource: 'local fallback',
-  voiceSource: 'device voice',
-  visualSource: 'cinematic fallback',
+  voiceSource: 'AI voice pending',
+  visualSource: 'AI imagery pending',
+  visualGeneratedCount: 0,
+  visualCoveredCount: 0,
   visualStyle: 'cursed-real',
   sceneImages: [],
   audioBuffer: null,
@@ -249,6 +264,8 @@ function setSources() {
   voiceSourceEl.textContent = state.voiceSource;
   visualSourceEl.textContent = state.visualSource;
   trendSourcePill.textContent = state.trendSource;
+  if (resultVisualSourceEl) resultVisualSourceEl.textContent = state.visualSource;
+  if (resultVoiceSourceEl) resultVoiceSourceEl.textContent = state.voiceSource;
 }
 
 function setGenerating(busy) {
@@ -346,34 +363,107 @@ function loadImage(dataURI) {
   });
 }
 
-async function requestSceneImage(scene, sceneIndex, visualStyle, prompt) {
-  const response = await fetch('/api/visualize', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', accept: 'application/json' },
-    body: JSON.stringify({
-      visualPrompt: [
-        scene.visualPrompt,
-        sceneIndex > 0
-          ? 'Continue the immediately previous story beat: preserve the same recurring subject identity, appearance, world, props, lighting logic, and screen direction while advancing only the described action.'
-          : 'Establish the recurring subject, world, props, lighting logic, and screen direction clearly so following beats can continue from it.',
-      ].join(' '),
-      style: visualStyle,
-      seed: seedFromString(`${prompt}:${sceneIndex}:${scene.subject}:${scene.setting}`),
-    }),
+function sceneVisualPrompt(scene, sceneIndex) {
+  return [
+    scene.visualPrompt,
+    sceneIndex > 0
+      ? 'Continue the immediately previous story beat: preserve the same recurring subject identity, appearance, world, props, lighting logic, and screen direction while advancing only the described action.'
+      : 'Establish the recurring subject, world, props, lighting logic, and screen direction clearly so following beats can continue from it.',
+  ].join(' ');
+}
+
+function blobToDataURI(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error || new Error('blob decode failed'));
+    reader.readAsDataURL(blob);
   });
-  if (!response.ok) throw new Error(`visualize ${response.status}`);
-  const data = await response.json();
-  if (!data?.dataURI) throw new Error('empty visual');
-  return { image: await loadImage(data.dataURI), source: data.source || 'Workers AI' };
+}
+
+async function localizePuterImage(candidate) {
+  const src = typeof candidate === 'string' ? candidate : candidate?.src;
+  if (!src) throw new Error('Puter returned no image source');
+  if (src.startsWith('data:')) return loadImage(src);
+  const response = await fetch(src, { mode: 'cors' });
+  if (!response.ok) throw new Error(`Puter image download ${response.status}`);
+  const blob = await response.blob();
+  const dataURI = await blobToDataURI(blob);
+  return loadImage(dataURI);
+}
+
+async function requestPuterSceneImage(visualPrompt) {
+  if (!window.puter?.ai?.txt2img) throw new Error('Puter image fallback unavailable');
+  let lastError = new Error('No Puter image model was available.');
+  for (const provider of PUTER_IMAGE_MODELS) {
+    try {
+      const candidate = await window.puter.ai.txt2img(visualPrompt, { model: provider.model });
+      return { image: await localizePuterImage(candidate), source: provider.label };
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error || provider.label));
+    }
+  }
+  throw lastError;
+}
+
+async function requestSceneImage(scene, sceneIndex, visualStyle, prompt) {
+  const visualPrompt = sceneVisualPrompt(scene, sceneIndex);
+  try {
+    const response = await fetch('/api/visualize', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify({
+        visualPrompt,
+        style: visualStyle,
+        seed: seedFromString(`${prompt}:${sceneIndex}:${scene.subject}:${scene.setting}`),
+      }),
+    });
+    if (response.ok) {
+      const data = await response.json();
+      if (data?.dataURI) return { image: await loadImage(data.dataURI), source: data.source || 'Cloudflare Workers AI' };
+    }
+  } catch {
+    // Continue into keyless/user-funded provider fallbacks.
+  }
+
+  const stylePrompt = getVisualStylePreset(visualStyle).prompt;
+  return requestPuterSceneImage([
+    stylePrompt,
+    visualPrompt,
+    'vertical 9:16 social-video composition',
+    'no text, subtitles, logos, watermarks, UI, or speech bubbles',
+  ].join('. '));
+}
+
+function summarizeVisualSources(sources, reusedCount) {
+  const counts = new Map();
+  sources.filter(Boolean).forEach(source => counts.set(source, (counts.get(source) || 0) + 1));
+  const parts = [...counts.entries()].map(([source, count]) => `${source} ${count}`);
+  if (reusedCount) parts.push(`reused ${reusedCount}`);
+  return parts.length ? parts.join(' · ') : 'story-card fallback';
+}
+
+function nearestImageIndex(results, target) {
+  let best = -1;
+  let distance = Infinity;
+  results.forEach((image, index) => {
+    if (!image) return;
+    const nextDistance = Math.abs(index - target);
+    if (nextDistance < distance) {
+      distance = nextDistance;
+      best = index;
+    }
+  });
+  return best;
 }
 
 async function generateSceneImages(token) {
   if (!state.story) return 0;
   const scenes = state.story.scenes;
   const results = Array(scenes.length).fill(null);
+  const sources = Array(scenes.length).fill('');
   let cursor = 0;
   let completed = 0;
-  let firstSource = '';
 
   async function worker() {
     while (cursor < scenes.length) {
@@ -383,7 +473,7 @@ async function generateSceneImages(token) {
         const result = await requestSceneImage(scenes[index], index, state.visualStyle, state.story.prompt);
         if (token !== state.generateToken) return;
         results[index] = result.image;
-        firstSource ||= result.source;
+        sources[index] = result.source;
       } catch {
         results[index] = null;
       }
@@ -391,7 +481,9 @@ async function generateSceneImages(token) {
       if (token === state.generateToken) {
         const ready = results.filter(Boolean).length;
         state.sceneImages = [...results];
-        state.visualSource = ready ? `${firstSource || 'Workers AI'} · ${ready}/${scenes.length}` : 'cinematic fallback';
+        state.visualGeneratedCount = ready;
+        state.visualCoveredCount = ready;
+        state.visualSource = ready ? summarizeVisualSources(sources, 0) : 'trying fallback imagery…';
         updateLoadingGallery(results, completed, scenes.length);
         setSources();
         drawFrame(0);
@@ -402,11 +494,26 @@ async function generateSceneImages(token) {
 
   await Promise.all([worker(), worker()]);
   if (token !== state.generateToken) return 0;
+
+  const generated = results.filter(Boolean).length;
+  let reusedCount = 0;
+  if (generated > 0) {
+    for (let index = 0; index < results.length; index += 1) {
+      if (results[index]) continue;
+      const nearest = nearestImageIndex(results, index);
+      if (nearest >= 0) {
+        results[index] = results[nearest];
+        reusedCount += 1;
+      }
+    }
+  }
+
   state.sceneImages = results;
-  const ready = results.filter(Boolean).length;
-  state.visualSource = ready ? `${firstSource || 'Workers AI'} · ${ready}/${scenes.length}` : 'cinematic fallback';
+  state.visualGeneratedCount = generated;
+  state.visualCoveredCount = results.filter(Boolean).length;
+  state.visualSource = summarizeVisualSources(sources, reusedCount);
   setSources();
-  return ready;
+  return generated;
 }
 
 function ensureAudioContext() {
@@ -454,6 +561,53 @@ async function requestNarration(text) {
   };
 }
 
+function sleep(ms) {
+  return new Promise(resolve => window.setTimeout(resolve, ms));
+}
+
+async function decodePuterSpeech(candidate) {
+  const src = typeof candidate === 'string' ? candidate : candidate?.src || candidate?.currentSrc;
+  if (!src) throw new Error('Puter TTS returned no audio source');
+  const response = await fetch(src, { mode: 'cors' });
+  if (!response.ok) throw new Error(`Puter TTS audio download ${response.status}`);
+  const arrayBuffer = await response.arrayBuffer();
+  const context = ensureAudioContext();
+  return context.decodeAudioData(arrayBuffer.slice(0));
+}
+
+async function requestPuterNarration(text) {
+  if (!window.puter?.ai?.txt2speech) throw new Error('Puter TTS fallback unavailable');
+  let lastError = new Error('No Puter TTS provider was available.');
+  for (const provider of PUTER_TTS_FALLBACKS) {
+    try {
+      const candidate = await window.puter.ai.txt2speech(text, provider.options);
+      return {
+        buffer: await decodePuterSpeech(candidate),
+        source: provider.label,
+        voiceMode: 'narrator',
+        narratorVoice: provider.options.voice || 'provider default',
+        characterVoice: '',
+      };
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error || provider.label));
+    }
+  }
+  throw lastError;
+}
+
+async function requestNarrationWithFallback(text) {
+  try {
+    return await requestNarration(text);
+  } catch {
+    await sleep(650);
+    try {
+      return await requestNarration(text);
+    } catch {
+      return requestPuterNarration(text);
+    }
+  }
+}
+
 function canRecordNarratedVideo() {
   return Boolean(state.audioBuffer && canvas.captureStream && window.MediaRecorder && (window.AudioContext || window.webkitAudioContext));
 }
@@ -496,8 +650,10 @@ async function generate(promptValue) {
   state.sceneImages = [];
   state.visualStyle = visualStyle;
   state.storySource = 'local fallback';
-  state.voiceSource = 'device voice';
-  state.visualSource = 'cinematic fallback';
+  state.voiceSource = 'AI voice pending';
+  state.visualSource = 'Cloudflare → free AI fallbacks';
+  state.visualGeneratedCount = 0;
+  state.visualCoveredCount = 0;
   setSources();
   updatePlaybackControls();
   drawWelcome('PLANNING SHOTS...');
@@ -526,7 +682,7 @@ async function generate(promptValue) {
 
   setStatus('Story cooked. Building scene imagery and narration in parallel…', 'busy');
   const visualPromise = generateSceneImages(token);
-  const narrationPromise = requestNarration(narrationText()).then(narration => {
+  const narrationPromise = requestNarrationWithFallback(narrationText()).then(narration => {
     if (token !== state.generateToken) return;
     state.audioBuffer = narration.buffer;
     state.voiceSource = narration.voiceMode === 'dual'
@@ -552,11 +708,13 @@ async function generate(promptValue) {
   setView('result');
   updatePlaybackControls();
   if (readyImages === scenes.length) {
-    setStatus('Ready. Eight AI keyframes drive 32 linked motion shots plus narration.', 'ok');
+    setStatus('Ready. Eight fresh AI keyframes drive 32 linked motion shots plus narration.', 'ok');
+  } else if (readyImages > 0 && state.visualCoveredCount === scenes.length) {
+    setStatus(`Ready. ${readyImages}/8 fresh AI keyframes generated; missing beats reuse the nearest generated imagery so all 32 shots stay visual.`, 'ok');
   } else if (readyImages > 0) {
-    setStatus(`Ready. ${readyImages}/8 AI keyframes are live; 32 linked motion shots still cover the full minute.`, 'ok');
+    setStatus(`Ready. ${readyImages}/8 fresh AI keyframes are live; remaining shots use the story-card fallback.`, 'warn');
   } else {
-    setStatus('Ready. Image AI was unavailable, so all 32 linked shots use the story-matched cinematic fallback.', 'warn');
+    setStatus('Ready. All image providers were unavailable, so the story-card fallback is carrying the 32 shots.', 'warn');
   }
 }
 
