@@ -156,7 +156,11 @@ Rules:
 - Hook immediately in scene 1, escalate through scenes 2-6, callback in scene 7, punchline/final verdict in scene 8.
 - Every scene must depict the literal story beat being narrated. Do not generate unrelated generic meme imagery.
 - Keep the same recurring subject, appearance, world, and recurring props visually consistent across all 8 scenes.
+- Keep the recurring protagonist clearly visible and recognizable in at least 6 of the 8 scene prompts; avoid empty environments or abstract-only shots.
+- visualPrompt must describe concrete visible people/creatures, objects, location, physical action, camera framing, and lighting. It must not ask the image model to depict abstract concepts such as aura, rizz, energy, gravity, loop, lore, side quest, confusion, or fear as text, symbols, fog, blobs, or graphics.
+- If an abstract story idea matters, translate it into a visible physical event or character reaction instead.
 - visualPrompt must include vertical 9:16 social-video framing, the scene's subject, setting, action, camera, mood, continuity details, and the requested style.
+- Keep any signs, screens, paperwork, labels, posters, license plates, or displays blank, unreadable, defocused, or too small to read.
 - Unless the selected style is cartoon, explicitly avoid cartoon, anime, illustration, emoji, mascot, toy-like, and flat-vector aesthetics.
 - visualPrompt must say there should be no text, subtitles, logos, watermarks, UI, or speech bubbles inside the generated image.
 - Brainrot pacing: meme logic, fake lore, aura/rizz/side-quest energy, surprising escalation, quotable lines. Do not merely repeat slang.
