@@ -10,9 +10,8 @@ import {
   normalizeScenes,
   normalizeVisualStyle,
   getVisualStylePreset,
-  MICRO_SHOTS_PER_SCENE,
-  buildMicroShotTimeline,
 } from '../app-core.mjs';
+import * as core from '../app-core.mjs';
 
 test('countWords and validatePrompt enforce nine-word limit', () => {
   assert.equal(countWords('one two three'), 3);
@@ -92,9 +91,9 @@ test('all visual styles expand eight story beats into thirty-two linked micro-sh
   for (const style of styles) {
     const story = buildFallbackStory('frog at the DMV', style);
     const sceneTimeline = buildSceneTimeline(story.scenes, 60);
-    const shots = buildMicroShotTimeline(sceneTimeline, style);
+    const shots = core.buildMicroShotTimeline(sceneTimeline, style);
 
-    assert.equal(MICRO_SHOTS_PER_SCENE, 4);
+    assert.equal(core.MICRO_SHOTS_PER_SCENE, 4);
     assert.equal(shots.length, 32);
     assert.equal(shots[0].start, 0);
     assert.equal(shots.at(-1).end, 60);
@@ -118,8 +117,8 @@ test('all visual styles expand eight story beats into thirty-two linked micro-sh
 test('linked micro-shots preserve beat-to-beat continuity and style-specific motion language', () => {
   const story = buildFallbackStory('frog at the DMV', 'cursed-real');
   const sceneTimeline = buildSceneTimeline(story.scenes, 60);
-  const realistic = buildMicroShotTimeline(sceneTimeline, 'cursed-real');
-  const cartoon = buildMicroShotTimeline(sceneTimeline, 'cartoon');
+  const realistic = core.buildMicroShotTimeline(sceneTimeline, 'cursed-real');
+  const cartoon = core.buildMicroShotTimeline(sceneTimeline, 'cartoon');
 
   assert.equal(realistic[4].sceneIndex, 1);
   assert.equal(realistic[4].transitionFromSceneIndex, 0);
