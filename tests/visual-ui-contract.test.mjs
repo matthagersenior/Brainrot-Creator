@@ -133,6 +133,7 @@ test('quality-first image fallback uses Pollinations ahead of emergency Horde an
   assert.match(app, /for \(const model of \['flux', 'zimage'\]\)/);
   assert.match(app, /inspectImageQuality/);
   assert.match(app, /rejected low-detail frame/);
+  assert.match(app, /graphic\/text-like frame/);
   assert.match(app, /scheduled nearest-anchor reuse/);
   assert.match(app, /do not visualize abstract words or concepts/);
 });
