@@ -412,11 +412,16 @@ function inspectImageQuality(image) {
   let mean = 0;
   let dark = 0;
   let bright = 0;
+  let chromaTotal = 0;
 
   for (let i = 0, p = 0; i < data.length; i += 4, p += 1) {
-    const value = data[i] * 0.2126 + data[i + 1] * 0.7152 + data[i + 2] * 0.0722;
+    const red = data[i];
+    const green = data[i + 1];
+    const blue = data[i + 2];
+    const value = red * 0.2126 + green * 0.7152 + blue * 0.0722;
     luminance[p] = value;
     mean += value;
+    chromaTotal += (Math.max(red, green, blue) - Math.min(red, green, blue)) / 255;
     if (value < 18) dark += 1;
     if (value > 240) bright += 1;
   }
@@ -445,10 +450,20 @@ function inspectImageQuality(image) {
   const edgeDensity = edgeChecks ? edgeHits / edgeChecks : 0;
   const darkRatio = dark / luminance.length;
   const brightRatio = bright / luminance.length;
-  const ok = stddev >= 22 && edgeDensity >= 0.025 && darkRatio < 0.82 && brightRatio < 0.82;
+  const chromaMean = chromaTotal / luminance.length;
+  const graphicTextLike = chromaMean < 0.09
+    && (darkRatio + brightRatio) > 0.52
+    && edgeDensity > 0.065;
+  const ok = stddev >= 22
+    && edgeDensity >= 0.025
+    && darkRatio < 0.82
+    && brightRatio < 0.82
+    && !graphicTextLike;
   return {
     ok,
-    reason: `detail std ${stddev.toFixed(1)}, edges ${(edgeDensity * 100).toFixed(1)}%`,
+    reason: graphicTextLike
+      ? `graphic/text-like frame, chroma ${chromaMean.toFixed(2)}, edges ${(edgeDensity * 100).toFixed(1)}%`
+      : `detail std ${stddev.toFixed(1)}, edges ${(edgeDensity * 100).toFixed(1)}%`,
   };
 }
 
