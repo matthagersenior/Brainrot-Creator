@@ -197,13 +197,13 @@ jobs:
             --write-out '%{http_code}' \
             -X POST "$base/api/narrate" \
             -H 'content-type: application/json' \
-            --data '{"text":"Testing the Brainrot narrator."}')"
+            --data '{"text":"The clerk leaned closer. \"Your aura expired yesterday.\" The whole DMV froze.","visualStyle":"cursed-real","moods":["uncanny","deadpan"]}')"
           if [[ "$narrate_status" != "200" ]]; then
             echo "Narration endpoint failed with HTTP $narrate_status:"
             cat "$RUNNER_TEMP/narrate.json"
             exit 1
           fi
-          jq -e '(.source | startswith("gemini-")) and (.sampleRate == 24000) and (.pcmBase64 | length > 1000)' "$RUNNER_TEMP/narrate.json" >/dev/null
-          echo "Gemini narration endpoint passed."
+          jq -e '(.source | startswith("gemini-")) and (.sampleRate == 24000) and (.pcmBase64 | length > 1000) and (.voiceMode == "dual") and (.narratorVoice == "Charon") and (.characterVoice == "Enceladus")' "$RUNNER_TEMP/narrate.json" >/dev/null
+          echo "Gemini story-matched dual-voice narration endpoint passed."
 
           echo "Cloudflare production smoke test passed: page, trends, real FLUX image, structured story, and narration."
