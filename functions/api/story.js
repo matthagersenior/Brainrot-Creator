@@ -160,6 +160,8 @@ Rules:
 - Unless the selected style is cartoon, explicitly avoid cartoon, anime, illustration, emoji, mascot, toy-like, and flat-vector aesthetics.
 - visualPrompt must say there should be no text, subtitles, logos, watermarks, UI, or speech bubbles inside the generated image.
 - Brainrot pacing: meme logic, fake lore, aura/rizz/side-quest energy, surprising escalation, quotable lines. Do not merely repeat slang.
+- Include exactly 1 or 2 short direct quotes, written with standard double quotes, from the same recurring featured character somewhere in scenes 2-7.
+- Each direct quote should be 2 to 8 spoken words and feel natural to that story beat. The same recurring featured character must speak every quoted line so two-speaker TTS can give that character one consistent voice.
 - color must be a six-digit hex color used only for UI/caption accenting.
 - burst must be 1 to 3 uppercase words tied to that scene.
 - Keep it clearly fictional and comedic. Do not invent damaging factual claims about real people.

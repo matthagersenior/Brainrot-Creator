@@ -81,3 +81,13 @@ test('cooking screen uses story-blind chaos instead of revealing generated keyfr
   assert.doesNotMatch(app, /tile\.style\.backgroundImage\s*=\s*.*image\.src/);
   assert.match(html, /aria-label="Story-blind Brainrot cooking animation"/);
 });
+
+
+test('client sends story style and mood arc to TTS and labels story-matched voice mode', async () => {
+  const app = await readFile(new URL('app.mjs', root), 'utf8');
+
+  assert.match(app, /visualStyle:\s*state\.visualStyle/);
+  assert.match(app, /moods:\s*state\.story\.scenes\.map/);
+  assert.match(app, /voiceMode/);
+  assert.match(app, /story-matched/);
+});

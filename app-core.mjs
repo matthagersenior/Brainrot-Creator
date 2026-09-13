@@ -207,7 +207,7 @@ export function buildFallbackStory(promptValue, visualStyleValue = 'cursed-real'
       burst: 'RIZZ UNLOCKED',
     },
     {
-      text: `A random customer whispers plot twist, the floor display turns into a loading bar, and the line advances exactly one impossible inch.`,
+      text: `The frog whispers, "plot twist," the floor display turns into a loading bar, and the line advances exactly one impossible inch.`,
       setting: 'the same DMV floor and queue ropes, with ordinary customers still present',
       action: 'a realistic illuminated loading-bar pattern appears across the floor while the queue inches forward',
       camera: 'top-down tilt into a wide reaction shot',

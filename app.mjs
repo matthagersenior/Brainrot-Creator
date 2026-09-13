@@ -370,12 +370,22 @@ async function requestNarration(text) {
   const response = await fetch('/api/narrate', {
     method: 'POST',
     headers: { 'content-type': 'application/json', accept: 'application/json' },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({
+      text,
+      visualStyle: state.visualStyle,
+      moods: state.story.scenes.map(scene => scene.mood).filter(Boolean),
+    }),
   });
   if (!response.ok) throw new Error(`narration ${response.status}`);
   const data = await response.json();
   if (!data?.pcmBase64) throw new Error('empty narration');
-  return { buffer: decodePcm16(data.pcmBase64, Number(data.sampleRate) || 24000), source: data.source || 'Gemini TTS' };
+  return {
+    buffer: decodePcm16(data.pcmBase64, Number(data.sampleRate) || 24000),
+    source: data.source || 'Gemini TTS',
+    voiceMode: data.voiceMode || 'narrator',
+    narratorVoice: data.narratorVoice || '',
+    characterVoice: data.characterVoice || '',
+  };
 }
 
 function canRecordNarratedVideo() {
@@ -453,7 +463,9 @@ async function generate(promptValue) {
   const narrationPromise = requestNarration(narrationText()).then(narration => {
     if (token !== state.generateToken) return;
     state.audioBuffer = narration.buffer;
-    state.voiceSource = narration.source;
+    state.voiceSource = narration.voiceMode === 'dual'
+      ? `${narration.source} · story-matched · 2 voices`
+      : `${narration.source} · story-matched`;
     setSources();
   }).catch(() => {
     if (token !== state.generateToken) return;
@@ -542,8 +554,15 @@ function startDeviceSpeech() {
   }
   const text = narrationText();
   const utterance = new SpeechSynthesisUtterance(text);
-  utterance.rate = Math.max(0.72, Math.min(1.35, countWords(text) / 170));
-  utterance.pitch = 1.04;
+  const deviceProfile = {
+    'cursed-real': { rate: 0.96, pitch: 0.92 },
+    photoreal: { rate: 1.0, pitch: 1.0 },
+    cinematic: { rate: 0.92, pitch: 0.9 },
+    cartoon: { rate: 1.1, pitch: 1.12 },
+  }[state.visualStyle] || { rate: 1, pitch: 1 };
+  const pacingRate = Math.max(0.72, Math.min(1.35, countWords(text) / 170));
+  utterance.rate = Math.max(0.72, Math.min(1.35, pacingRate * deviceProfile.rate));
+  utterance.pitch = deviceProfile.pitch;
   utterance.volume = 1;
   utterance.addEventListener('boundary', event => {
     if (event.name === 'word') state.speechWordIndex = wordIndexFromCharIndex(text, event.charIndex);
