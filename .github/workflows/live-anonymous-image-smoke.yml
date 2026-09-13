@@ -1,21 +1,31 @@
-name: Compare Cloudflare production and deployment function
+name: Inspect Cloudflare canonical deployment
 
 on:
   push:
     branches: ["verify/live-anonymous-image"]
 
 jobs:
-  compare-function-routing:
+  inspect-canonical:
     runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      PROJECT: brainrot-creator
     steps:
-      - name: Compare provider response on immutable deployment and alias
+      - name: Inspect canonical deployment and configs
         shell: bash
         run: |
-          set -u
-          body='{"provider":"pollinations","visualPrompt":"photorealistic young traveler lost in an Ohio cornfield at dusk, holding phone GPS, clear subject, vertical 9:16, no text","model":"flux","seed":42}'
-          for base in "https://418d53ba.brainrot-creator.pages.dev" "https://brainrot-creator.pages.dev"; do
-            echo "=== $base ==="
-            status="$(curl --silent --show-error --max-time 70               --output "$RUNNER_TEMP/response.json"               --write-out '%{http_code}'               -X POST "$base/api/horde-image"               -H 'content-type: application/json'               --data "$body")"
-            echo "HTTP $status"
-            jq '{source,model,error,detail,bytes,dataLength:(.dataURI // "" | length)}' "$RUNNER_TEMP/response.json" || cat "$RUNNER_TEMP/response.json"
-          done
+          set -euo pipefail
+          curl --fail --silent --show-error             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PROJECT"             > "$RUNNER_TEMP/project.json"
+          jq '{
+            production_branch:.result.production_branch,
+            canonical_deployment:{
+              id:.result.canonical_deployment.id,
+              url:.result.canonical_deployment.url,
+              environment:.result.canonical_deployment.environment,
+              branch:.result.canonical_deployment.deployment_trigger.metadata.branch,
+              commit_hash:.result.canonical_deployment.deployment_trigger.metadata.commit_hash,
+              aliases:.result.canonical_deployment.aliases
+            },
+            deployment_configs:.result.deployment_configs
+          }' "$RUNNER_TEMP/project.json"
