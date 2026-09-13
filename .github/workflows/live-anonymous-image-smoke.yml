@@ -5,36 +5,23 @@ on:
     branches: ["verify/live-anonymous-image"]
 
 jobs:
-  verify-anonymous-provider:
+  verify-live-production-fallback:
     runs-on: ubuntu-latest
     steps:
-      - name: Submit zero-kudos vertical image directly to AI Horde
+      - name: Generate a real frame through production API
         shell: bash
         run: |
           set -euo pipefail
-          base="https://aihorde.net/api/v2"
-          headers=(-H 'apikey: 0000000000' -H 'Client-Agent: brainrot-creator:1.0:github.com/matthagersenior/Brainrot-Creator')
-          curl --fail --silent --show-error             "${headers[@]}" -H 'content-type: application/json'             -X POST "$base/generate/async"             --data '{"prompt":"cinematic live-action frog standing in an Ohio cornfield at dusk ### text, captions, logos, watermarks, blurry","params":{"n":1,"width":320,"height":576,"steps":6,"cfg_scale":6.5,"sampler_name":"k_euler_a","seed":"424242","karras":true},"nsfw":false,"censor_nsfw":true,"r2":true,"shared":false,"slow_workers":true,"replacement_filter":true}'             > "$RUNNER_TEMP/submit.json"
-          jq -e '.id and (.id | length > 0)' "$RUNNER_TEMP/submit.json" >/dev/null
-          id="$(jq -r '.id' "$RUNNER_TEMP/submit.json")"
-          echo "Accepted anonymous job $id"
-
-          for attempt in {1..30}; do
-            sleep 2
-            curl --fail --silent --show-error "${headers[@]}" "$base/generate/check/$id" > "$RUNNER_TEMP/check.json"
-            if jq -e '.faulted == true' "$RUNNER_TEMP/check.json" >/dev/null; then
-              cat "$RUNNER_TEMP/check.json"
-              exit 1
-            fi
-            if jq -e '(.done == true) or ((.finished // 0) > 0)' "$RUNNER_TEMP/check.json" >/dev/null; then
-              curl --fail --silent --show-error "${headers[@]}" "$base/generate/status/$id" > "$RUNNER_TEMP/status.json"
-              jq -e '(.generations | length) > 0 and (.generations[0].img | length) > 100' "$RUNNER_TEMP/status.json" >/dev/null
-              jq '{model:.generations[0].model,imgLength:(.generations[0].img|length)}' "$RUNNER_TEMP/status.json"
-              echo "ZERO_KUDOS_VERTICAL_IMAGE_OK"
+          base="https://brainrot-creator.pages.dev"
+          for attempt in {1..3}; do
+            status="$(curl --silent --show-error --max-time 55               --output "$RUNNER_TEMP/horde.json"               --write-out '%{http_code}'               -X POST "$base/api/horde-image"               -H 'content-type: application/json'               --data '{"visualPrompt":"cinematic live-action frog standing in an Ohio cornfield at dusk, vertical 9:16, realistic photography, no text, no logos","seed":424242}')"
+            echo "Attempt $attempt HTTP $status"
+            jq '{source,model,error,detail,dataLength:(.dataURI // "" | length)}' "$RUNNER_TEMP/horde.json"
+            if [[ "$status" == "200" ]] && jq -e '(.source | startswith("AI Horde")) and (.dataURI | startswith("data:image/")) and (.dataURI | length > 1000)' "$RUNNER_TEMP/horde.json" >/dev/null; then
+              echo "LIVE_PRODUCTION_ANONYMOUS_IMAGE_OK"
               exit 0
             fi
+            sleep 3
           done
-
-          echo "Anonymous queue did not finish in 60 seconds."
-          curl --silent --show-error "${headers[@]}" -X DELETE "$base/generate/status/$id" >/dev/null || true
+          echo "Production anonymous image fallback did not return a real image."
           exit 1
