@@ -91,3 +91,25 @@ test('client sends story style and mood arc to TTS and labels story-matched voic
   assert.match(app, /voiceMode/);
   assert.match(app, /story-matched/);
 });
+
+test('free-first fallback chain tries Cloudflare before non-Gemini Puter image providers and keeps device speech last', async () => {
+  const html = await readFile(new URL('index.html', root), 'utf8');
+  const app = await readFile(new URL('app.mjs', root), 'utf8');
+
+  assert.match(html, /https:\/\/js\.puter\.com\/v2\//);
+  assert.match(html, /id="resultVisualSource"/);
+  assert.match(html, /id="resultVoiceSource"/);
+
+  const cloudflare = app.indexOf('/api/visualize');
+  const juggernaut = app.indexOf('rundiffusion/juggernaut-lightning-flux');
+  const stableDiffusion = app.indexOf('stabilityai/stable-diffusion-3-medium');
+  const leonardo = app.indexOf('leonardoai/lucid-origin');
+  assert.ok(cloudflare >= 0 && juggernaut >= 0 && stableDiffusion >= 0 && leonardo >= 0);
+  assert.match(app, /txt2img/);
+  assert.doesNotMatch(app, /gemini-[^'"]*image|nano banana/i);
+
+  assert.match(app, /requestNarrationWithFallback/);
+  assert.match(app, /txt2speech/);
+  assert.match(app, /device speechSynthesis/);
+  assert.match(app, /nearest generated imagery/);
+});
