@@ -135,3 +135,34 @@ test('story endpoint falls back when a model returns HTTP 200 with malformed JSO
     globalThis.fetch = originalFetch;
   }
 });
+
+
+test('story endpoint accepts a rich prompt above the old nine-word limit and plans recurring character dialogue', async () => {
+  const originalFetch = globalThis.fetch;
+  let requestedBody = null;
+  globalThis.fetch = async (_url, init = {}) => {
+    requestedBody = JSON.parse(String(init.body || '{}'));
+    return successfulGeminiResponse();
+  };
+
+  const prompt = 'A nervous frog goes to the DMV for a license renewal while the WiFi becomes sentient and the clerk treats everything as normal.';
+  try {
+    const response = await onRequestPost({
+      request: new Request('https://example.test/api/story', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ prompt, visualStyle: 'cinematic' }),
+      }),
+      env: { GEMINI_API_KEY: 'test-key' },
+    });
+    const body = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(body.scenes.length, 8);
+    const instructions = requestedBody.contents[0].parts[0].text;
+    assert.match(instructions, /2 to 4 short direct quotes/i);
+    assert.match(instructions, /same recurring featured character/i);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
