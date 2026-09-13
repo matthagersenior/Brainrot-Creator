@@ -21,9 +21,8 @@ const FALLBACK_TRENDS = [
 ];
 
 const PUTER_IMAGE_MODELS = Object.freeze([
-  Object.freeze({ model: 'rundiffusion/juggernaut-lightning-flux', label: 'Puter · Juggernaut Lightning FLUX' }),
-  Object.freeze({ model: 'stabilityai/stable-diffusion-3-medium', label: 'Puter · Stable Diffusion 3' }),
-  Object.freeze({ model: 'leonardoai/lucid-origin', label: 'Puter · Leonardo Lucid Origin' }),
+  Object.freeze({ provider: 'replicate-image-generation', model: 'black-forest-labs/flux-schnell', label: 'Puter · FLUX Schnell' }),
+  Object.freeze({ provider: 'replicate-image-generation', model: 'leonardoai/lucid-origin', label: 'Puter · Leonardo Lucid Origin' }),
 ]);
 
 const PUTER_TTS_FALLBACKS = Object.freeze([
@@ -99,6 +98,7 @@ const state = {
   visualSource: 'AI imagery pending',
   visualGeneratedCount: 0,
   visualCoveredCount: 0,
+  visualErrors: [],
   visualStyle: 'cursed-real',
   sceneImages: [],
   audioBuffer: null,
@@ -393,11 +393,18 @@ async function localizePuterImage(candidate) {
 }
 
 async function requestPuterSceneImage(visualPrompt) {
-  if (!window.puter?.ai?.txt2img) throw new Error('Puter image fallback unavailable');
+  if (!window.puter?.ai?.txt2img) throw new Error('Puter runtime unavailable');
+  if (window.puter?.auth?.isSignedIn && !window.puter.auth.isSignedIn()) {
+    throw new Error('Puter signed out');
+  }
   let lastError = new Error('No Puter image model was available.');
   for (const provider of PUTER_IMAGE_MODELS) {
     try {
-      const candidate = await window.puter.ai.txt2img(visualPrompt, { model: provider.model });
+      const candidate = await window.puter.ai.txt2img(visualPrompt, {
+        provider: provider.provider,
+        model: provider.model,
+        ratio: { w: 9, h: 16 },
+      });
       return { image: await localizePuterImage(candidate), source: provider.label };
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error || provider.label));
@@ -406,41 +413,79 @@ async function requestPuterSceneImage(visualPrompt) {
   throw lastError;
 }
 
+async function requestHordeSceneImage(visualPrompt, seed) {
+  const response = await fetch('/api/horde-image', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', accept: 'application/json' },
+    body: JSON.stringify({ visualPrompt, seed }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const detail = data?.detail || data?.error || `HTTP ${response.status}`;
+    throw new Error(`AI Horde ${detail}`);
+  }
+  if (!data?.dataURI) throw new Error('AI Horde empty image');
+  return {
+    image: await loadImage(data.dataURI),
+    source: data.source || 'AI Horde · anonymous community',
+  };
+}
+
 async function requestSceneImage(scene, sceneIndex, visualStyle, prompt) {
   const visualPrompt = sceneVisualPrompt(scene, sceneIndex);
+  const seed = seedFromString(`${prompt}:${sceneIndex}:${scene.subject}:${scene.setting}`);
+  const failures = [];
+
   try {
     const response = await fetch('/api/visualize', {
       method: 'POST',
       headers: { 'content-type': 'application/json', accept: 'application/json' },
-      body: JSON.stringify({
-        visualPrompt,
-        style: visualStyle,
-        seed: seedFromString(`${prompt}:${sceneIndex}:${scene.subject}:${scene.setting}`),
-      }),
+      body: JSON.stringify({ visualPrompt, style: visualStyle, seed }),
     });
-    if (response.ok) {
-      const data = await response.json();
-      if (data?.dataURI) return { image: await loadImage(data.dataURI), source: data.source || 'Cloudflare Workers AI' };
+    const data = await response.json().catch(() => ({}));
+    if (response.ok && data?.dataURI) {
+      return { image: await loadImage(data.dataURI), source: data.source || 'Cloudflare Workers AI' };
     }
+    failures.push(`Cloudflare ${response.status}`);
   } catch {
-    // Continue into keyless/user-funded provider fallbacks.
+    failures.push('Cloudflare unavailable');
   }
 
   const stylePrompt = getVisualStylePreset(visualStyle).prompt;
-  return requestPuterSceneImage([
+  const fallbackPrompt = [
     stylePrompt,
     visualPrompt,
     'vertical 9:16 social-video composition',
     'no text, subtitles, logos, watermarks, UI, or speech bubbles',
-  ].join('. '));
+  ].join('. ');
+
+  // AI Horde supports anonymous, no-login generation. Generate four anchor frames,
+  // then reuse the nearest successful anchor for the in-between beats.
+  if (sceneIndex % 2 === 0) {
+    try {
+      return await requestHordeSceneImage(fallbackPrompt, seed);
+    } catch (error) {
+      failures.push(String(error?.message || 'AI Horde failed').slice(0, 80));
+    }
+  }
+
+  try {
+    return await requestPuterSceneImage(fallbackPrompt);
+  } catch (error) {
+    failures.push(String(error?.message || 'Puter failed').slice(0, 80));
+  }
+
+  throw new Error(failures.join(' → '));
 }
 
-function summarizeVisualSources(sources, reusedCount) {
+function summarizeVisualSources(sources, reusedCount, errors = []) {
   const counts = new Map();
   sources.filter(Boolean).forEach(source => counts.set(source, (counts.get(source) || 0) + 1));
   const parts = [...counts.entries()].map(([source, count]) => `${source} ${count}`);
   if (reusedCount) parts.push(`reused ${reusedCount}`);
-  return parts.length ? parts.join(' · ') : 'story-card fallback';
+  if (parts.length) return parts.join(' · ');
+  const reason = errors.find(Boolean);
+  return reason ? `story-card fallback · ${reason}` : 'story-card fallback';
 }
 
 function nearestImageIndex(results, target) {
@@ -462,6 +507,7 @@ async function generateSceneImages(token) {
   const scenes = state.story.scenes;
   const results = Array(scenes.length).fill(null);
   const sources = Array(scenes.length).fill('');
+  const errors = Array(scenes.length).fill('');
   let cursor = 0;
   let completed = 0;
 
@@ -474,8 +520,9 @@ async function generateSceneImages(token) {
         if (token !== state.generateToken) return;
         results[index] = result.image;
         sources[index] = result.source;
-      } catch {
+      } catch (error) {
         results[index] = null;
+        errors[index] = String(error?.message || error || 'image fallback failed').slice(0, 180);
       }
       completed += 1;
       if (token === state.generateToken) {
@@ -483,7 +530,8 @@ async function generateSceneImages(token) {
         state.sceneImages = [...results];
         state.visualGeneratedCount = ready;
         state.visualCoveredCount = ready;
-        state.visualSource = ready ? summarizeVisualSources(sources, 0) : 'trying fallback imagery…';
+        state.visualErrors = [...errors];
+        state.visualSource = ready ? summarizeVisualSources(sources, 0, errors) : completed < scenes.length ? 'trying anonymous image fallback…' : summarizeVisualSources(sources, 0, errors);
         updateLoadingGallery(results, completed, scenes.length);
         setSources();
         drawFrame(0);
@@ -511,7 +559,8 @@ async function generateSceneImages(token) {
   state.sceneImages = results;
   state.visualGeneratedCount = generated;
   state.visualCoveredCount = results.filter(Boolean).length;
-  state.visualSource = summarizeVisualSources(sources, reusedCount);
+  state.visualErrors = [...errors];
+  state.visualSource = summarizeVisualSources(sources, reusedCount, errors);
   setSources();
   return generated;
 }
@@ -654,6 +703,7 @@ async function generate(promptValue) {
   state.visualSource = 'Cloudflare → free AI fallbacks';
   state.visualGeneratedCount = 0;
   state.visualCoveredCount = 0;
+  state.visualErrors = [];
   setSources();
   updatePlaybackControls();
   drawWelcome('PLANNING SHOTS...');
