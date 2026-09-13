@@ -1,4 +1,5 @@
 import {
+  MAX_PROMPT_WORDS,
   TARGET_SECONDS,
   countWords,
   validatePrompt,
@@ -42,6 +43,8 @@ const trendRail = document.getElementById('trendRail');
 const trendSource = document.getElementById('trendSource');
 const chaosSelect = document.getElementById('chaosSelect');
 const visualStyleSelect = document.getElementById('visualStyleSelect');
+const installBtn = document.getElementById('installBtn');
+const installHint = document.getElementById('installHint');
 const genBtn = document.getElementById('genBtn');
 const quickBtn = document.getElementById('quickBtn');
 const statusText = document.getElementById('statusText');
@@ -69,6 +72,8 @@ const videoLengthEl = document.getElementById('videoLength');
 
 canvas.width = 720;
 canvas.height = 1280;
+
+let deferredInstallPrompt = null;
 
 const state = {
   trends: [...FALLBACK_TRENDS],
@@ -102,6 +107,67 @@ const state = {
   cookingChaosTimer: 0,
   cookingChaosTick: 0,
 };
+
+function isStandaloneApp() {
+  return window.matchMedia?.('(display-mode: standalone)').matches === true || window.navigator.standalone === true;
+}
+
+function refreshInstallUi(message = '') {
+  if (!installBtn || !installHint) return;
+  if (isStandaloneApp()) {
+    installBtn.hidden = true;
+    installHint.hidden = true;
+    return;
+  }
+  installBtn.hidden = false;
+  installHint.hidden = false;
+  installBtn.textContent = deferredInstallPrompt ? 'INSTALL APP' : 'ADD TO DEVICE';
+  installHint.textContent = message || (deferredInstallPrompt
+    ? 'ROT MACHINE is ready to install as a standalone app.'
+    : 'Use this button for install guidance, or your browser’s Install app / Add to Home Screen command.');
+}
+
+async function installApp() {
+  if (isStandaloneApp()) {
+    refreshInstallUi();
+    return;
+  }
+
+  if (deferredInstallPrompt) {
+    const prompt = deferredInstallPrompt;
+    deferredInstallPrompt = null;
+    await prompt.prompt();
+    const choice = await prompt.userChoice.catch(() => null);
+    refreshInstallUi(choice?.outcome === 'accepted'
+      ? 'Install accepted. ROT MACHINE will appear with your apps.'
+      : 'Install dismissed. You can install later from the browser menu.');
+    return;
+  }
+
+  const isiOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  refreshInstallUi(isiOS
+    ? 'On iPhone/iPad: tap Share, then Add to Home Screen.'
+    : 'Open your browser menu and choose Install app or Add to Home Screen.');
+}
+
+window.addEventListener('beforeinstallprompt', event => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  refreshInstallUi('ROT MACHINE is ready to install as a standalone app.');
+});
+
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  refreshInstallUi('Installed. Launch ROT MACHINE from your app screen.');
+});
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(() => {
+      refreshInstallUi('The app is online, but offline install support could not start in this browser.');
+    });
+  }, { once: true });
+}
 
 function setView(view) {
   const views = { create: createView, cooking: cookingView, result: resultView };
@@ -195,9 +261,9 @@ function setGenerating(busy) {
 
 function updateWordMeter() {
   const words = countWords(promptInput.value);
-  wordMeter.textContent = `${words} / 9 words`;
-  wordMeter.classList.toggle('over', words > 9);
-  genBtn.disabled = words < 1 || words > 9;
+  wordMeter.textContent = `${words} / ${MAX_PROMPT_WORDS} words`;
+  wordMeter.classList.toggle('over', words > MAX_PROMPT_WORDS);
+  genBtn.disabled = words < 1 || words > MAX_PROMPT_WORDS;
 }
 
 function renderTrendChips() {
@@ -1021,6 +1087,9 @@ function drawWelcome(label = 'READY TO ROT') {
   ctx.font = '650 23px ui-sans-serif, system-ui, sans-serif';
   ctx.fillText('Each beat flows through four motion-linked shots.', 360, 952);
 }
+
+installBtn?.addEventListener('click', installApp);
+refreshInstallUi();
 
 promptInput.addEventListener('input', updateWordMeter);
 genBtn.addEventListener('click', () => generate(promptInput.value));
