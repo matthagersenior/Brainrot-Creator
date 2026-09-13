@@ -9,5 +9,7 @@ test('mobile layout fits the real device viewport and safe areas', async () => {
   assert.match(css, /overflow-x:\s*clip/);
   assert.match(css, /env\(safe-area-inset-left\)/);
   assert.match(css, /env\(safe-area-inset-right\)/);
-  assert.match(css, /calc\(\(100dvh\s*-\s*190px\)\s*\*\s*9\s*\/\s*16\)/);
+  assert.match(css, /--preview-fit-height:/);
+  assert.match(css, /100svh/);
+  assert.match(css, /\.stage-shell[^{]*\{[^}]*calc\(var\(--preview-fit-height\)\s*\*\s*9\s*\/\s*16\)/s);
 });
