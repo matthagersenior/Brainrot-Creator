@@ -9,19 +9,19 @@
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-  <main class="app-shell">
-    <header class="hero">
-      <div class="brand-row">
-        <h1 class="brand">ROT MACHINE</h1>
-        <span class="free-badge">$0-FIRST MODE</span>
-      </div>
-      <p class="tagline">Nine words in. One minute of AI-written, narrated, subtitled, story-matched chaos out.</p>
-    </header>
+  <main class="app-shell flow-shell">
+    <section id="createView" class="app-view create-view" aria-labelledby="creatorTitle">
+      <header class="hero create-hero">
+        <div class="brand-row">
+          <h1 class="brand">ROT MACHINE</h1>
+          <span class="free-badge">$0-FIRST MODE</span>
+        </div>
+        <p class="tagline">Nine words in. One minute of AI-written, narrated, subtitled, story-matched chaos out.</p>
+      </header>
 
-    <div class="layout">
-      <section class="panel creator-panel" aria-labelledby="creatorTitle">
+      <section class="panel creator-panel create-card">
         <h2 id="creatorTitle">COOK THE ROT</h2>
-        <p class="panel-copy">Keep the prompt tiny. The machine writes the story, plans each shot, and tries to visualize every beat.</p>
+        <p class="panel-copy">Give it the seed. Pick the look. The rest of the screen gets out of the way until your video is ready.</p>
 
         <div class="trend-head">
           <strong>TRENDING ROT 🔥</strong>
@@ -59,21 +59,9 @@
           <button id="quickBtn" class="btn btn-rot" type="button">🎲 QUICK ROT</button>
         </div>
 
-        <div class="status-box" role="status" aria-live="polite">
-          <span id="statusDot" class="status-dot"></span>
-          <span id="statusText">Ready. Pick a trend, type up to nine words, or hit Quick Rot.</span>
-        </div>
-
-        <div class="sources" aria-label="Current generation sources">
-          <span class="source-pill">Story: <b id="storySource">local fallback</b></span>
-          <span class="source-pill">Voice: <b id="voiceSource">device voice</b></span>
-          <span class="source-pill">Visuals: <b id="visualSource">cinematic fallback</b></span>
-          <span class="source-pill">Trends: <b id="trendSourcePill">built-in rotation</b></span>
-        </div>
-
         <div class="visual-note">
-          <strong>STORY-SYNCED VISUALS</strong>
-          <span>8 AI keyframes keep one continuity profile, then expand into 32 linked motion shots so every visual style feels more like one continuous video.</span>
+          <strong>FREE MULTI-SHOT FORMAT</strong>
+          <span>8 AI keyframes become 32 linked motion shots in every visual style, with the same 60-second narration and subtitles.</span>
         </div>
 
         <div class="mini-facts">
@@ -82,25 +70,69 @@
           <div class="mini-fact"><b id="videoLength">60s</b><span>runtime</span></div>
         </div>
       </section>
+    </section>
 
-      <section class="panel stage-panel" aria-label="Brainrot video preview">
-        <div class="stage-shell">
+    <section id="cookingView" class="app-view cooking-view" hidden aria-labelledby="cookingTitle">
+      <div class="cooking-inner">
+        <div class="cooking-mark" aria-hidden="true">💀</div>
+        <p class="eyebrow">THE ROT IS COOKING</p>
+        <h2 id="cookingTitle">Building your one-minute disaster…</h2>
+        <p id="loadingProgress" class="loading-progress">Writing the story and planning 32 linked shots.</p>
+
+        <div id="loadingGallery" class="loading-gallery" aria-label="Generated scene progress">
+          <div class="loading-tile"><span>BEAT 1</span></div>
+          <div class="loading-tile"><span>BEAT 2</span></div>
+          <div class="loading-tile"><span>BEAT 3</span></div>
+          <div class="loading-tile"><span>BEAT 4</span></div>
+          <div class="loading-tile"><span>BEAT 5</span></div>
+          <div class="loading-tile"><span>BEAT 6</span></div>
+          <div class="loading-tile"><span>BEAT 7</span></div>
+          <div class="loading-tile"><span>BEAT 8</span></div>
+        </div>
+
+        <div class="status-box cooking-status" role="status" aria-live="polite">
+          <span id="statusDot" class="status-dot busy"></span>
+          <span id="statusText">Writing the story…</span>
+        </div>
+
+        <div class="sources cooking-sources" aria-label="Current generation sources">
+          <span class="source-pill">Story: <b id="storySource">local fallback</b></span>
+          <span class="source-pill">Voice: <b id="voiceSource">device voice</b></span>
+          <span class="source-pill">Visuals: <b id="visualSource">cinematic fallback</b></span>
+          <span class="source-pill">Trends: <b id="trendSourcePill">built-in rotation</b></span>
+        </div>
+      </div>
+    </section>
+
+    <section id="resultView" class="app-view result-view" hidden aria-labelledby="resultTitle">
+      <div class="result-shell">
+        <header class="result-header">
+          <div>
+            <p class="eyebrow">YOUR ROT IS READY</p>
+            <h2 id="resultTitle">One minute of cooked lore.</h2>
+          </div>
+          <span class="result-style" id="resultStyle">CURSED REAL</span>
+        </header>
+
+        <div class="stage-shell result-stage-shell">
           <canvas id="videoCanvas" width="720" height="1280" aria-label="Generated vertical video canvas"></canvas>
-          <span class="canvas-badge">9:16 • STORY SYNC</span>
+          <span class="canvas-badge">9:16 • 32 SHOTS</span>
         </div>
 
-        <div class="player-controls">
-          <button id="playBtn" class="btn btn-dark" type="button" disabled>▶ PLAY</button>
-          <button id="replayBtn" class="btn btn-dark" type="button" disabled>↻ REPLAY</button>
-          <button id="stopBtn" class="btn btn-dark" type="button" disabled>■ STOP</button>
-          <button id="downloadBtn" class="btn btn-download" type="button" disabled>⬇ VIDEO</button>
+        <div class="result-controls">
+          <button id="playPauseBtn" class="btn btn-dark" type="button" disabled>▶ PLAY</button>
+          <button id="repeatBtn" class="btn btn-dark" type="button" disabled>↻ REPEAT</button>
+          <button id="downloadBtn" class="btn btn-download" type="button" disabled>⬇ DOWNLOAD</button>
+          <button id="nextTrendBtn" class="btn btn-rot" type="button">🔥 NEXT TREND</button>
+          <button id="homeBtn" class="btn btn-home" type="button">⌂ HOME</button>
         </div>
-        <p id="downloadNote" class="download-note">Generate a rot first. AI scene images are composited into the same 60-second canvas used for export.</p>
-      </section>
-    </div>
 
-    <footer>
-      Live trend suggestions are filtered conservatively before becoming joke prompts. AI scene images use the selected style and story plan when Workers AI capacity is available. Real-person voice cloning is not used.
+        <p id="downloadNote" class="download-note result-note">Your full 720×1280 canvas stays export quality while the preview scales to fit this screen.</p>
+      </div>
+    </section>
+
+    <footer class="flow-footer">
+      Free-first generation. Real-person voice cloning is not used.
     </footer>
   </main>
 
