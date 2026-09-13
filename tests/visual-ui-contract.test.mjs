@@ -118,3 +118,20 @@ test('free-first fallback chain tries Cloudflare, anonymous AI Horde, then docum
   assert.match(app, /device speechSynthesis/);
   assert.match(app, /nearest generated imagery/);
 });
+
+test('quality-first image fallback uses Pollinations ahead of emergency Horde and rejects low-detail frames', async () => {
+  const app = await readFile(new URL('app.mjs', root), 'utf8');
+
+  const chain = app.slice(app.indexOf('async function requestSceneImage'), app.indexOf('function summarizeVisualSources'));
+  const cloudflare = chain.indexOf('/api/visualize');
+  const pollinations = chain.indexOf('requestPollinationsSceneImage');
+  const puter = chain.indexOf('requestPuterSceneImage');
+  const horde = chain.indexOf('requestHordeSceneImage');
+
+  assert.ok(cloudflare >= 0 && pollinations > cloudflare && puter > pollinations && horde > puter);
+  assert.match(app, /for \(const model of \['flux', 'zimage'\]\)/);
+  assert.match(app, /inspectImageQuality/);
+  assert.match(app, /rejected low-detail frame/);
+  assert.match(app, /scheduled nearest-anchor reuse/);
+  assert.match(app, /do not visualize abstract words or concepts/);
+});
