@@ -1,36 +1,28 @@
-name: Inspect Cloudflare Functions attachment
+name: Inspect deployed Pages Worker bundle
 
 on:
   push:
     branches: ["verify/live-anonymous-image"]
 
 jobs:
-  inspect-functions:
+  inspect-worker:
     runs-on: ubuntu-latest
     env:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      PROJECT: brainrot-creator
+      SCRIPT: pages-worker--19137760-production
     steps:
-      - name: Inspect project deployment function flags
+      - name: Inspect deployed production Worker script markers
         shell: bash
         run: |
-          set -euo pipefail
-          curl --fail --silent --show-error             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PROJECT"             > "$RUNNER_TEMP/project.json"
-          jq '{
-            project_uses_functions:.result.uses_functions,
-            production_script_name:.result.production_script_name,
-            preview_script_name:.result.preview_script_name,
-            canonical:{
-              id:.result.canonical_deployment.id,
-              url:.result.canonical_deployment.url,
-              commit:.result.canonical_deployment.deployment_trigger.metadata.commit_hash,
-              uses_functions:.result.canonical_deployment.uses_functions
-            },
-            latest:{
-              id:.result.latest_deployment.id,
-              url:.result.latest_deployment.url,
-              commit:.result.latest_deployment.deployment_trigger.metadata.commit_hash,
-              uses_functions:.result.latest_deployment.uses_functions
-            }
-          }' "$RUNNER_TEMP/project.json"
+          set -u
+          status="$(curl --silent --show-error             --output "$RUNNER_TEMP/worker.bin"             --write-out '%{http_code}'             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$SCRIPT")"
+          echo "Worker fetch HTTP $status"
+          echo "bytes=$(wc -c < "$RUNNER_TEMP/worker.bin")"
+          for marker in 'POLLINATIONS_BASE' 'pollinationsGenerate' 'provider ||' 'HORDE_TIMEOUT' 'AI Horde'; do
+            if grep -a -q "$marker" "$RUNNER_TEMP/worker.bin"; then
+              echo "FOUND: $marker"
+            else
+              echo "MISSING: $marker"
+            fi
+          done
