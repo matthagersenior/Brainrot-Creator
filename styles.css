@@ -488,3 +488,116 @@ footer { margin-top: 20px; color: #5f536e; text-align: center; font-size: 10px; 
 @media (prefers-reduced-motion: reduce) {
   .cooking-mark, .loading-tile::before { animation: none !important; }
 }
+
+
+/* Installable app shell */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 15% 8%, rgba(255,46,196,.14), transparent 28rem),
+    radial-gradient(circle at 85% 18%, rgba(0,229,255,.12), transparent 24rem),
+    linear-gradient(180deg, rgba(255,255,255,.015), transparent 18rem);
+}
+.app-utility {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  width: min(1180px, calc(100% - 24px));
+  min-height: 54px;
+  margin: 10px auto 0;
+  padding: 8px 10px 8px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 16px;
+  background: rgba(12,2,23,.78);
+  backdrop-filter: blur(18px) saturate(1.25);
+  box-shadow: 0 14px 45px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.04);
+}
+.utility-brand,
+.utility-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.utility-brand strong {
+  font-family: Impact, "Arial Black", sans-serif;
+  letter-spacing: .06em;
+  font-size: 15px;
+}
+.utility-brand > span:last-child {
+  color: #756a87;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .12em;
+}
+.utility-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--pink), var(--cyan));
+  box-shadow: 0 0 18px rgba(0,229,255,.45);
+}
+.utility-chip {
+  border: 1px solid rgba(140,82,255,.38);
+  border-radius: 999px;
+  padding: 6px 8px;
+  color: #cdbdff;
+  background: rgba(140,82,255,.08);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+.install-btn {
+  min-height: 36px;
+  border: 1px solid rgba(198,255,0,.46);
+  border-radius: 11px;
+  padding: 0 12px;
+  color: #071008;
+  background: linear-gradient(105deg, var(--lime), #f0ffad);
+  font-family: Impact, "Arial Black", sans-serif;
+  letter-spacing: .05em;
+  cursor: pointer;
+}
+.install-btn[hidden] { display: none; }
+.install-hint {
+  width: min(1180px, calc(100% - 32px));
+  margin: 7px auto 0;
+  color: #7f7190;
+  font-size: 10px;
+  text-align: right;
+}
+.prompt-wrap textarea { min-height: 132px; }
+.flow-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 5px 12px;
+}
+.create-card {
+  border-color: rgba(140,82,255,.28);
+  background:
+    linear-gradient(180deg, rgba(31,9,51,.95), rgba(12,3,23,.97)),
+    radial-gradient(circle at 100% 0%, rgba(0,229,255,.06), transparent 18rem);
+}
+@media (display-mode: standalone) {
+  .install-btn,
+  .install-hint { display: none !important; }
+  .app-utility { margin-top: max(8px, env(safe-area-inset-top)); }
+}
+@media (max-width: 600px) {
+  .app-utility {
+    width: calc(100% - 16px);
+    border-radius: 14px;
+    padding-inline: 9px;
+  }
+  .utility-brand > span:last-child,
+  .utility-chip { display: none; }
+  .install-hint { width: calc(100% - 22px); text-align: center; }
+}

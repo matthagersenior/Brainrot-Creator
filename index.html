@@ -4,11 +4,25 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#090011">
-  <meta name="description" content="Turn nine words or fewer into a narrated, story-synced 60-second Brainrot video.">
+  <meta name="description" content="Turn a rich prompt into a narrated, story-synced 60-second Brainrot video with linked motion shots and automatic voice casting.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ROT MACHINE">
   <title>ROT MACHINE — Brainrot Creator</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icons/icon-192.png" sizes="192x192" type="image/png">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
+  <div class="app-utility" role="banner">
+    <div class="utility-brand"><span class="utility-dot"></span><strong>ROT MACHINE</strong><span>AI SHORT CREATOR</span></div>
+    <div class="utility-actions">
+      <span class="utility-chip">AUTO VOICE CAST</span>
+      <button id="installBtn" class="install-btn" type="button">INSTALL APP</button>
+    </div>
+  </div>
+  <p id="installHint" class="install-hint" aria-live="polite">Install ROT MACHINE on your phone, tablet, or laptop for a standalone app experience.</p>
   <main class="app-shell flow-shell">
     <section id="createView" class="app-view create-view" aria-labelledby="creatorTitle">
       <header class="hero create-hero">
@@ -16,12 +30,12 @@
           <h1 class="brand">ROT MACHINE</h1>
           <span class="free-badge">$0-FIRST MODE</span>
         </div>
-        <p class="tagline">Nine words in. One minute of AI-written, narrated, subtitled, story-matched chaos out.</p>
+        <p class="tagline">A richer prompt in. One minute of AI-written, multi-voice, subtitled, story-matched chaos out.</p>
       </header>
 
       <section class="panel creator-panel create-card">
         <h2 id="creatorTitle">COOK THE ROT</h2>
-        <p class="panel-copy">Give it the seed. Pick the look. The rest of the screen gets out of the way until your video is ready.</p>
+        <p class="panel-copy">Describe the idea, characters, setting, or twist in up to 60 words. Pick the look and energy; ROT MACHINE handles story structure, automatic voice casting, linked shots, subtitles, and export.</p>
 
         <div class="trend-head">
           <strong>TRENDING ROT 🔥</strong>
@@ -30,8 +44,8 @@
         <div id="trendRail" class="trend-rail" aria-label="Trending prompt starters"></div>
 
         <div class="prompt-wrap">
-          <textarea id="promptInput" maxlength="140" rows="3" placeholder="Nintendo at the DMV with zero aura" aria-label="Brainrot prompt"></textarea>
-          <span id="wordMeter" class="word-meter">0 / 9 words</span>
+          <textarea id="promptInput" maxlength="500" rows="5" placeholder="Example: A nervous frog goes to the DMV for a license renewal while the WiFi becomes sentient and the clerk treats everything as normal." aria-label="Brainrot prompt"></textarea>
+          <span id="wordMeter" class="word-meter">0 / 60 words</span>
         </div>
 
         <div class="control-grid">
@@ -61,13 +75,14 @@
 
         <div class="visual-note">
           <strong>FREE MULTI-SHOT FORMAT</strong>
-          <span>8 AI keyframes become 32 linked motion shots in every visual style, with the same 60-second narration and subtitles.</span>
+          <span>8 AI keyframes become 32 linked motion shots in every visual style. Gemini automatically casts a narrator plus a recurring character voice when the story contains dialogue.</span>
         </div>
 
         <div class="mini-facts">
           <div class="mini-fact"><b id="sceneCount">32</b><span>linked shots</span></div>
           <div class="mini-fact"><b id="scriptWords">~150</b><span>words</span></div>
           <div class="mini-fact"><b id="videoLength">60s</b><span>runtime</span></div>
+          <div class="mini-fact"><b>2</b><span>auto-cast voices</span></div>
         </div>
       </section>
     </section>
@@ -132,7 +147,7 @@
     </section>
 
     <footer class="flow-footer">
-      Free-first generation. Real-person voice cloning is not used.
+      <span>Free-first generation.</span><span>Installable PWA.</span><span>Automatic story-matched voice cast.</span><span>Real-person voice cloning is not used.</span>
     </footer>
   </main>
 
