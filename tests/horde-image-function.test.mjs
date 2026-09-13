@@ -49,8 +49,9 @@ test('anonymous AI Horde fallback submits, polls, localizes, and returns an imag
     assert.equal(submit.init.headers.get('apikey'), '0000000000');
     const submittedBody = JSON.parse(submit.init.body);
     assert.equal(submittedBody.nsfw, false);
-    assert.equal(submittedBody.params.width, 512);
-    assert.equal(submittedBody.params.height, 896);
+    assert.equal(submittedBody.params.width, 320);
+    assert.equal(submittedBody.params.height, 576);
+    assert.equal(submittedBody.params.steps, 6);
   } finally {
     globalThis.fetch = originalFetch;
   }

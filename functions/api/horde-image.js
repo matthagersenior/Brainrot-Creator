@@ -78,9 +78,9 @@ export async function onRequestPost({ request, env = {} }) {
       prompt: `${visualPrompt} ### text, captions, subtitles, logos, watermarks, UI, blurry, deformed`,
       params: {
         n: 1,
-        width: 512,
-        height: 896,
-        steps: 10,
+        width: 320,
+        height: 576,
+        steps: 6,
         cfg_scale: 6.5,
         sampler_name: 'k_euler_a',
         seed,
