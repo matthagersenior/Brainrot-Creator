@@ -507,10 +507,10 @@ async function requestPuterSceneImage(visualPrompt) {
 }
 
 async function requestPollinationsSceneImage(visualPrompt, seed, model) {
-  const response = await fetch('/api/pollinations-image', {
+  const response = await fetch('/api/horde-image', {
     method: 'POST',
     headers: { 'content-type': 'application/json', accept: 'application/json' },
-    body: JSON.stringify({ visualPrompt, seed, model }),
+    body: JSON.stringify({ provider: 'pollinations', visualPrompt, seed, model }),
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok || !data?.dataURI) {
@@ -527,7 +527,7 @@ async function requestHordeSceneImage(visualPrompt, seed) {
   const response = await fetch('/api/horde-image', {
     method: 'POST',
     headers: { 'content-type': 'application/json', accept: 'application/json' },
-    body: JSON.stringify({ visualPrompt, seed }),
+    body: JSON.stringify({ provider: 'horde', visualPrompt, seed }),
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
