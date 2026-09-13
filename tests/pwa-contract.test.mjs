@@ -47,3 +47,11 @@ test('polished app shell exposes install affordance and automatic voice-cast sta
   assert.match(css, /\.install-btn/);
   assert.match(css, /backdrop-filter/);
 });
+
+
+test('Cloudflare production bundle includes and verifies the PWA assets', async () => {
+  const workflow = await readFile(new URL('.github/workflows/static.yml', root), 'utf8');
+  assert.match(workflow, /manifest\.webmanifest sw\.js/);
+  assert.match(workflow, /icons\/icon-192\.png icons\/icon-512\.png/);
+  assert.match(workflow, /PWA manifest and service worker passed/);
+});
