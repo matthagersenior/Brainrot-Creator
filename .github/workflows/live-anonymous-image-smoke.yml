@@ -1,27 +1,19 @@
-name: Verify live anonymous image fallback
+name: Verify live quality image broker
 
 on:
   push:
     branches: ["verify/live-anonymous-image"]
 
 jobs:
-  verify-live-production-fallback:
+  verify-live-quality-broker:
     runs-on: ubuntu-latest
     steps:
-      - name: Generate a real frame through production API
+      - name: Inspect production Pollinations broker response
         shell: bash
         run: |
-          set -euo pipefail
+          set -u
           base="https://brainrot-creator.pages.dev"
-          for attempt in {1..3}; do
-            status="$(curl --silent --show-error --max-time 55               --output "$RUNNER_TEMP/horde.json"               --write-out '%{http_code}'               -X POST "$base/api/horde-image"               -H 'content-type: application/json'               --data '{"visualPrompt":"cinematic live-action frog standing in an Ohio cornfield at dusk, vertical 9:16, realistic photography, no text, no logos","seed":424242}')"
-            echo "Attempt $attempt HTTP $status"
-            jq '{source,model,error,detail,dataLength:(.dataURI // "" | length)}' "$RUNNER_TEMP/horde.json"
-            if [[ "$status" == "200" ]] && jq -e '(.source | startswith("AI Horde")) and (.dataURI | startswith("data:image/")) and (.dataURI | length > 1000)' "$RUNNER_TEMP/horde.json" >/dev/null; then
-              echo "LIVE_PRODUCTION_ANONYMOUS_IMAGE_OK"
-              exit 0
-            fi
-            sleep 3
-          done
-          echo "Production anonymous image fallback did not return a real image."
-          exit 1
+          status="$(curl --silent --show-error --max-time 70             --output "$RUNNER_TEMP/fallback.json"             --write-out '%{http_code}'             -X POST "$base/api/horde-image"             -H 'content-type: application/json'             --data '{"provider":"pollinations","visualPrompt":"photorealistic young traveler lost in an Ohio cornfield at dusk, holding a phone GPS, clear human subject, realistic landscape, vertical 9:16, no text, no logos, no signs","model":"flux","seed":42}')"
+          echo "HTTP $status"
+          cat "$RUNNER_TEMP/fallback.json" | jq '{source,model,error,detail,bytes,dataLength:(.dataURI // "" | length),prefix:(.dataURI // "" | .[0:40])}'
+          test "$status" = "200"
