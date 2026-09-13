@@ -92,7 +92,7 @@ test('client sends story style and mood arc to TTS and labels story-matched voic
   assert.match(app, /story-matched/);
 });
 
-test('free-first fallback chain tries Cloudflare before non-Gemini Puter image providers and keeps device speech last', async () => {
+test('free-first fallback chain tries Cloudflare, anonymous AI Horde, then documented Puter providers and keeps device speech last', async () => {
   const html = await readFile(new URL('index.html', root), 'utf8');
   const app = await readFile(new URL('app.mjs', root), 'utf8');
 
@@ -100,11 +100,16 @@ test('free-first fallback chain tries Cloudflare before non-Gemini Puter image p
   assert.match(html, /id="resultVisualSource"/);
   assert.match(html, /id="resultVoiceSource"/);
 
-  const cloudflare = app.indexOf('/api/visualize');
-  const juggernaut = app.indexOf('rundiffusion/juggernaut-lightning-flux');
-  const stableDiffusion = app.indexOf('stabilityai/stable-diffusion-3-medium');
+  const sceneChain = app.slice(app.indexOf('async function requestSceneImage'), app.indexOf('function summarizeVisualSources'));
+  const cloudflare = sceneChain.indexOf('/api/visualize');
+  const horde = sceneChain.indexOf('requestHordeSceneImage');
+  const puter = sceneChain.indexOf('requestPuterSceneImage');
+  const flux = app.indexOf('black-forest-labs/flux-schnell');
   const leonardo = app.indexOf('leonardoai/lucid-origin');
-  assert.ok(cloudflare >= 0 && juggernaut >= 0 && stableDiffusion >= 0 && leonardo >= 0);
+  assert.ok(cloudflare >= 0 && horde > cloudflare && puter > horde);
+  assert.ok(flux >= 0 && leonardo >= 0);
+  assert.match(app, /replicate-image-generation/);
+  assert.match(app, /Puter signed out/);
   assert.match(app, /txt2img/);
   assert.doesNotMatch(app, /gemini-[^'"]*image|nano banana/i);
 
