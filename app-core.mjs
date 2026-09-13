@@ -157,7 +157,9 @@ function sceneVisualPrompt(scene, continuity, style) {
     `action: ${scene.action}`,
     `camera: ${scene.camera}`,
     `mood: ${scene.mood}`,
-    'show the described action clearly; no text, captions, logos, watermarks, UI, or speech bubbles inside the generated image',
+    'show a clear recognizable focal subject performing the described physical action in the literal location; do not turn abstract concepts into text, symbols, fog, blobs, or graphics',
+    'keep signs, screens, paperwork, labels, and displays blank, unreadable, defocused, or too small to read',
+    'no text, captions, logos, watermarks, UI, title cards, posters, or speech bubbles inside the generated image',
   ].join('. ');
 }
 
