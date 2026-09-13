@@ -1,23 +1,21 @@
-name: Inspect Cloudflare Pages production routing
+name: Compare Cloudflare production and deployment function
 
 on:
   push:
     branches: ["verify/live-anonymous-image"]
 
 jobs:
-  inspect-pages-project:
+  compare-function-routing:
     runs-on: ubuntu-latest
-    env:
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      PROJECT: brainrot-creator
     steps:
-      - name: Inspect project and latest deployments
+      - name: Compare provider response on immutable deployment and alias
         shell: bash
         run: |
-          set -euo pipefail
-          curl --fail --silent --show-error             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PROJECT"             > "$RUNNER_TEMP/project.json"
-          jq '{production_branch:.result.production_branch,subdomain:.result.subdomain,source:.result.source}' "$RUNNER_TEMP/project.json"
-
-          curl --fail --silent --show-error             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PROJECT/deployments?per_page=10"             > "$RUNNER_TEMP/deployments.json"
-          jq '[.result[] | {id,environment,url,branch:.deployment_trigger.metadata.branch,commit_hash:.deployment_trigger.metadata.commit_hash,latest_stage:(.latest_stage.name // null),stage_status:(.latest_stage.status // null)}]' "$RUNNER_TEMP/deployments.json"
+          set -u
+          body='{"provider":"pollinations","visualPrompt":"photorealistic young traveler lost in an Ohio cornfield at dusk, holding phone GPS, clear subject, vertical 9:16, no text","model":"flux","seed":42}'
+          for base in "https://418d53ba.brainrot-creator.pages.dev" "https://brainrot-creator.pages.dev"; do
+            echo "=== $base ==="
+            status="$(curl --silent --show-error --max-time 70               --output "$RUNNER_TEMP/response.json"               --write-out '%{http_code}'               -X POST "$base/api/horde-image"               -H 'content-type: application/json'               --data "$body")"
+            echo "HTTP $status"
+            jq '{source,model,error,detail,bytes,dataLength:(.dataURI // "" | length)}' "$RUNNER_TEMP/response.json" || cat "$RUNNER_TEMP/response.json"
+          done
