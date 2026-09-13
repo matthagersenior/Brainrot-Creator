@@ -19,6 +19,21 @@ const FALLBACK_TRENDS = [
   'streamer speedrun', 'mystery mascot', 'football celebration', 'movie trailer reaction', 'AI pet', 'retro game remake',
 ];
 
+const COOKING_CHAOS_LABELS = [
+  'AURA OVERCLOCKED', 'LORE BUFFERING', 'RIZZ COMPILING', 'MEME PARTICLES',
+  'REALITY LAGGING', 'BRAINcells OFFLINE', 'PIXELS FERMENTING', 'CHAOS VERIFIED',
+  'ROT ENGINE HOT', 'NPC SIGNAL LOST', 'SIDE QUEST LOADING', 'VIBES UNSTABLE',
+];
+
+const COOKING_CHAOS_BACKGROUNDS = [
+  'radial-gradient(circle at 20% 25%, rgba(255,46,196,.95), transparent 24%), linear-gradient(145deg, #130520 0%, #30104a 48%, #001f29 100%)',
+  'radial-gradient(circle at 76% 18%, rgba(198,255,0,.9), transparent 18%), linear-gradient(160deg, #071a20 0%, #112933 48%, #4a0f38 100%)',
+  'conic-gradient(from 25deg at 50% 50%, #ff2ec4, #24132d, #00e5ff, #090011, #c6ff00, #ff2ec4)',
+  'linear-gradient(25deg, transparent 0 18%, rgba(0,229,255,.8) 19% 24%, transparent 25% 43%, rgba(255,46,196,.9) 44% 52%, transparent 53%), #130520',
+  'radial-gradient(ellipse at 70% 70%, rgba(140,82,255,.9), transparent 28%), radial-gradient(circle at 28% 34%, rgba(255,91,33,.75), transparent 20%), #071018',
+  'repeating-linear-gradient(115deg, #0d0317 0 18px, #ff2ec4 19px 24px, #071018 25px 42px, #00e5ff 43px 47px)',
+];
+
 const canvas = document.getElementById('videoCanvas');
 const ctx = canvas.getContext('2d');
 const promptInput = document.getElementById('promptInput');
@@ -84,6 +99,8 @@ const state = {
   stopTimer: 0,
   speechWordIndex: null,
   generateToken: 0,
+  cookingChaosTimer: 0,
+  cookingChaosTick: 0,
 };
 
 function setView(view) {
@@ -99,25 +116,47 @@ function setView(view) {
 
 function resetLoadingGallery() {
   [...loadingGallery.children].forEach((tile, index) => {
-    tile.classList.remove('loaded');
+    tile.classList.remove('loaded', 'chaos-pop');
     tile.style.backgroundImage = '';
+    tile.style.transform = '';
     const label = tile.querySelector('span');
-    if (label) label.textContent = `BEAT ${index + 1}`;
+    if (label) label.textContent = COOKING_CHAOS_LABELS[index % COOKING_CHAOS_LABELS.length];
   });
-  loadingProgress.textContent = 'Writing the story and planning 32 linked shots.';
+  loadingProgress.textContent = 'Cooking 32 linked shots behind a spoiler shield.';
+}
+
+function renderCookingChaos() {
+  state.cookingChaosTick += 1;
+  [...loadingGallery.children].forEach((tile, index) => {
+    const phase = state.cookingChaosTick + index * 3;
+    const background = COOKING_CHAOS_BACKGROUNDS[phase % COOKING_CHAOS_BACKGROUNDS.length];
+    const label = COOKING_CHAOS_LABELS[(phase * 5 + index) % COOKING_CHAOS_LABELS.length];
+    const rotation = ((phase % 7) - 3) * 0.8;
+    const scale = 0.97 + ((phase + index) % 5) * 0.012;
+
+    tile.style.backgroundImage = background;
+    tile.style.transform = `rotate(${rotation}deg) scale(${scale})`;
+    tile.classList.toggle('chaos-pop', phase % 2 === 0);
+    const text = tile.querySelector('span');
+    if (text) text.textContent = label;
+  });
+}
+
+function startCookingChaos() {
+  stopCookingChaos();
+  state.cookingChaosTick = Math.floor(Math.random() * COOKING_CHAOS_LABELS.length);
+  renderCookingChaos();
+  state.cookingChaosTimer = window.setInterval(renderCookingChaos, 720);
+}
+
+function stopCookingChaos() {
+  if (state.cookingChaosTimer) window.clearInterval(state.cookingChaosTimer);
+  state.cookingChaosTimer = 0;
 }
 
 function updateLoadingGallery(results, completed, total) {
-  results.forEach((image, index) => {
-    const tile = loadingGallery.children[index];
-    if (!tile || !image?.src) return;
-    tile.style.backgroundImage = `linear-gradient(rgba(0,0,0,.08), rgba(0,0,0,.2)), url("${image.src}")`;
-    tile.classList.add('loaded');
-    const label = tile.querySelector('span');
-    if (label) label.textContent = `BEAT ${index + 1} ✓`;
-  });
   const ready = results.filter(Boolean).length;
-  loadingProgress.textContent = `${completed}/${total} keyframes processed · ${ready} ready · 32 linked shots planned`;
+  loadingProgress.textContent = `${completed}/${total} keyframes processed · ${ready} ready · story hidden until reveal`;
 }
 
 function nextTrendPrompt() {
@@ -372,6 +411,7 @@ async function generate(promptValue) {
   stopPlayback(true);
   resetLoadingGallery();
   setView('cooking');
+  startCookingChaos();
   setGenerating(true);
   state.audioBuffer = null;
   state.story = null;
@@ -430,6 +470,7 @@ async function generate(promptValue) {
   resultStyle.textContent = getVisualStylePreset(visualStyle).label;
   setGenerating(false);
   updateWordMeter();
+  stopCookingChaos();
   setView('result');
   updatePlaybackControls();
   if (readyImages === scenes.length) {
@@ -979,6 +1020,7 @@ repeatBtn.addEventListener('click', repeatPlayback);
 downloadBtn.addEventListener('click', () => play({ record: true }));
 nextTrendBtn.addEventListener('click', generateNextTrend);
 homeBtn.addEventListener('click', () => {
+  stopCookingChaos();
   stopPlayback(true);
   setView('create');
   promptInput.focus();
@@ -989,7 +1031,10 @@ visualStyleSelect.addEventListener('change', () => {
   if (state.story) setStatus('Visual style changed. Generate again to rebuild all 32 linked shots in this style.', 'warn');
 });
 
-window.addEventListener('beforeunload', () => stopPlayback(false));
+window.addEventListener('beforeunload', () => {
+  stopCookingChaos();
+  stopPlayback(false);
+});
 window.setInterval(rotateTrendRail, 12_000);
 
 setView('create');
