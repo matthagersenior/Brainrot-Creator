@@ -121,8 +121,9 @@ jobs:
         shell: bash
         run: |
           rm -rf .pages-dist
-          mkdir .pages-dist
-          cp index.html styles.css app.mjs app-core.mjs _headers .pages-dist/
+          mkdir -p .pages-dist/icons
+          cp index.html styles.css app.mjs app-core.mjs manifest.webmanifest sw.js _headers .pages-dist/
+          cp icons/icon-192.png icons/icon-512.png .pages-dist/icons/
 
       - name: Deploy to Cloudflare Pages
         if: steps.cloudflare.outputs.ready == 'true'
@@ -146,7 +147,8 @@ jobs:
           for attempt in {1..30}; do
             if curl --fail --silent --show-error "$base/" > "$RUNNER_TEMP/page.html" \
               && grep -q 'ROT MACHINE' "$RUNNER_TEMP/page.html" \
-              && grep -q 'visualStyleSelect' "$RUNNER_TEMP/page.html"; then
+              && grep -q 'visualStyleSelect' "$RUNNER_TEMP/page.html" \
+              && grep -q 'installBtn' "$RUNNER_TEMP/page.html"; then
               alias_ready=true
               echo "Cloudflare production alias is current on attempt $attempt."
               break
@@ -158,6 +160,11 @@ jobs:
             exit 1
           fi
           echo "Live page passed."
+
+          curl --fail --silent --show-error "$base/manifest.webmanifest" > "$RUNNER_TEMP/manifest.json"
+          jq -e '(.display == "standalone") and (.start_url == "/") and (.icons | any(.sizes == "192x192")) and (.icons | any(.sizes == "512x512"))' "$RUNNER_TEMP/manifest.json" >/dev/null
+          curl --fail --silent --show-error "$base/sw.js" | grep -q "CACHE_NAME"
+          echo "PWA manifest and service worker passed."
 
           curl --fail --silent --show-error --retry 6 --retry-delay 2 --retry-all-errors \
             "$base/api/trends" > "$RUNNER_TEMP/trends.json"
@@ -206,4 +213,4 @@ jobs:
           jq -e '(.source | startswith("gemini-")) and (.sampleRate == 24000) and (.pcmBase64 | length > 1000) and (.voiceMode == "dual") and (.narratorVoice == "Charon") and (.characterVoice == "Enceladus")' "$RUNNER_TEMP/narrate.json" >/dev/null
           echo "Gemini story-matched dual-voice narration endpoint passed."
 
-          echo "Cloudflare production smoke test passed: page, trends, real FLUX image, structured story, and narration."
+          echo "Cloudflare production smoke test passed: installable PWA shell, trends, real FLUX image, structured story, and dual-voice narration."
