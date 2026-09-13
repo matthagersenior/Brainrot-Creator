@@ -1,0 +1,21 @@
+name: Verify live anonymous image fallback
+
+on:
+  push:
+    branches: ["verify/live-anonymous-image"]
+
+jobs:
+  verify-live-fallback:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate a real production fallback frame
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://brainrot-creator.pages.dev"
+          status="$(curl --silent --show-error --max-time 60             --output "$RUNNER_TEMP/horde.json"             --write-out '%{http_code}'             -X POST "$base/api/horde-image"             -H 'content-type: application/json'             --data '{"visualPrompt":"cinematic live-action frog standing in an Ohio cornfield at dusk, vertical 9:16, realistic photography, no text, no logos","seed":424242}')"
+          echo "HTTP $status"
+          cat "$RUNNER_TEMP/horde.json" | jq '{source,model,error,detail,dataLength:(.dataURI // "" | length)}'
+          test "$status" = "200"
+          jq -e '(.source | startswith("AI Horde")) and (.dataURI | startswith("data:image/")) and (.dataURI | length > 1000)' "$RUNNER_TEMP/horde.json" >/dev/null
+          echo "LIVE_ANONYMOUS_IMAGE_FALLBACK_OK"
