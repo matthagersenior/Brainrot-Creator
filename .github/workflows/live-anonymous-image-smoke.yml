@@ -1,31 +1,36 @@
-name: Inspect Cloudflare canonical deployment
+name: Inspect Cloudflare Functions attachment
 
 on:
   push:
     branches: ["verify/live-anonymous-image"]
 
 jobs:
-  inspect-canonical:
+  inspect-functions:
     runs-on: ubuntu-latest
     env:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       PROJECT: brainrot-creator
     steps:
-      - name: Inspect canonical deployment and configs
+      - name: Inspect project deployment function flags
         shell: bash
         run: |
           set -euo pipefail
           curl --fail --silent --show-error             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$PROJECT"             > "$RUNNER_TEMP/project.json"
           jq '{
-            production_branch:.result.production_branch,
-            canonical_deployment:{
+            project_uses_functions:.result.uses_functions,
+            production_script_name:.result.production_script_name,
+            preview_script_name:.result.preview_script_name,
+            canonical:{
               id:.result.canonical_deployment.id,
               url:.result.canonical_deployment.url,
-              environment:.result.canonical_deployment.environment,
-              branch:.result.canonical_deployment.deployment_trigger.metadata.branch,
-              commit_hash:.result.canonical_deployment.deployment_trigger.metadata.commit_hash,
-              aliases:.result.canonical_deployment.aliases
+              commit:.result.canonical_deployment.deployment_trigger.metadata.commit_hash,
+              uses_functions:.result.canonical_deployment.uses_functions
             },
-            deployment_configs:.result.deployment_configs
+            latest:{
+              id:.result.latest_deployment.id,
+              url:.result.latest_deployment.url,
+              commit:.result.latest_deployment.deployment_trigger.metadata.commit_hash,
+              uses_functions:.result.latest_deployment.uses_functions
+            }
           }' "$RUNNER_TEMP/project.json"
