@@ -1,4 +1,6 @@
-export const MAX_PROMPT_WORDS = 9;
+export const MAX_PROMPT_WORDS = 60;
+export const MAX_PROMPT_CHARS = 500;
+export const TREND_PROMPT_WORDS = 12;
 export const TARGET_SECONDS = 60;
 export const SCENE_COUNT = 8;
 
@@ -81,7 +83,7 @@ export function cleanPrompt(value = '') {
     .replace(/[<>]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
-    .slice(0, 140);
+    .slice(0, MAX_PROMPT_CHARS);
 }
 
 export function validatePrompt(value = '') {
@@ -89,7 +91,7 @@ export function validatePrompt(value = '') {
   const words = countWords(prompt);
   if (!prompt) return { ok: false, prompt, words, error: 'Give the machine something to rot.' };
   if (words > MAX_PROMPT_WORDS) {
-    return { ok: false, prompt, words, error: `Keep it to ${MAX_PROMPT_WORDS} words or fewer.` };
+    return { ok: false, prompt, words, error: `Keep it to ${MAX_PROMPT_WORDS} words or fewer so the one-minute story stays focused.` };
   }
   return { ok: true, prompt, words, error: '' };
 }
@@ -175,7 +177,7 @@ export function buildFallbackStory(promptValue, visualStyleValue = 'cursed-real'
       burst: 'AURA DETECTED',
     },
     {
-      text: `A suspicious frog at the counter starts rating everybody's aura on a clipboard, while the clerk continues working like this is completely normal.`,
+      text: `A suspicious frog at the counter checks the clipboard and says, "Aura audit started," while the clerk keeps working like this is completely normal.`,
       setting: 'the same DMV service counter and waiting area',
       action: 'a realistic frog-like clerk marks aura scores on a clipboard while customers wait',
       camera: 'documentary over-the-shoulder shot, shallow depth of field',
@@ -207,7 +209,7 @@ export function buildFallbackStory(promptValue, visualStyleValue = 'cursed-real'
       burst: 'RIZZ UNLOCKED',
     },
     {
-      text: `The frog whispers, "plot twist," the floor display turns into a loading bar, and the line advances exactly one impossible inch.`,
+      text: `The frog whispers, "Plot twist," the floor display turns into a loading bar, and the line advances exactly one impossible inch.`,
       setting: 'the same DMV floor and queue ropes, with ordinary customers still present',
       action: 'a realistic illuminated loading-bar pattern appears across the floor while the queue inches forward',
       camera: 'top-down tilt into a wide reaction shot',
@@ -215,7 +217,7 @@ export function buildFallbackStory(promptValue, visualStyleValue = 'cursed-real'
       burst: 'PLOT TWIST',
     },
     {
-      text: `The frog returns with printed receipts proving the entire disaster was a side quest, and every exhausted customer accepts this explanation immediately.`,
+      text: `The frog returns with printed receipts, says, "Side quest complete," and every exhausted customer immediately accepts this explanation.`,
       setting: 'the same DMV counter with receipt printer, paperwork, and tired customers',
       action: 'frog clerk holds long printed receipts while customers study them with resigned expressions',
       camera: 'close-up on receipts, then gentle handheld pullback to the group',
@@ -354,7 +356,7 @@ export function trendToPrompt(value = '') {
   if (!cleaned) return 'mystery meme with zero aura';
 
   const modifier = MODIFIERS[hashString(cleaned) % MODIFIERS.length];
-  const words = `${cleaned} ${modifier}`.split(/\s+/).filter(Boolean).slice(0, MAX_PROMPT_WORDS);
+  const words = `${cleaned} ${modifier}`.split(/\s+/).filter(Boolean).slice(0, TREND_PROMPT_WORDS);
   return words.join(' ');
 }
 
