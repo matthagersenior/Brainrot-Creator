@@ -41,3 +41,30 @@ test('creator labels the free multi-shot format and carries prior-beat continuit
   assert.match(app, /Continue the immediately previous story beat/);
   assert.match(app, /sceneCountEl\.textContent = state\.microTimeline\.length/);
 });
+
+
+test('creator uses separate create, cooking, and result screens with final-player actions', async () => {
+  const html = await readFile(new URL('index.html', root), 'utf8');
+  const app = await readFile(new URL('app.mjs', root), 'utf8');
+  const css = await readFile(new URL('styles.css', root), 'utf8');
+
+  assert.match(html, /id="createView"/);
+  assert.match(html, /id="cookingView"/);
+  assert.match(html, /id="resultView"/);
+  assert.match(html, /id="loadingGallery"/);
+  assert.match(html, /id="playPauseBtn"/);
+  assert.match(html, /id="repeatBtn"/);
+  assert.match(html, /id="nextTrendBtn"/);
+  assert.match(html, /id="homeBtn"/);
+
+  assert.match(app, /setView\(['"]cooking['"]\)/);
+  assert.match(app, /setView\(['"]result['"]\)/);
+  assert.match(app, /pausePlayback/);
+  assert.match(app, /resumePlayback/);
+  assert.match(app, /generateNextTrend/);
+  assert.match(app, /loadingGallery/);
+
+  assert.match(css, /\.app-view\[hidden\]/);
+  assert.match(css, /100svh/);
+  assert.match(css, /\.result-stage-shell/);
+});
