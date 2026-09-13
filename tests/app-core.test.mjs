@@ -13,10 +13,11 @@ import {
 } from '../app-core.mjs';
 import * as core from '../app-core.mjs';
 
-test('countWords and validatePrompt enforce nine-word limit', () => {
+test('countWords and validatePrompt allow rich prompts up to sixty words', () => {
   assert.equal(countWords('one two three'), 3);
   assert.equal(validatePrompt('one two three').ok, true);
-  assert.equal(validatePrompt('one two three four five six seven eight nine ten').ok, false);
+  assert.equal(validatePrompt(Array.from({ length: 60 }, (_, i) => `word${i}`).join(' ')).ok, true);
+  assert.equal(validatePrompt(Array.from({ length: 61 }, (_, i) => `word${i}`).join(' ')).ok, false);
 });
 
 test('fallback story always has eight valid story-driven visual scenes', () => {
@@ -78,9 +79,9 @@ test('sensitive trends are rejected conservatively', () => {
   assert.equal(isSafeTrend('presidential election results'), false);
 });
 
-test('trendToPrompt stays within nine words', () => {
+test('trendToPrompt stays concise even though manual prompts may be richer', () => {
   const prompt = trendToPrompt('Nintendo Ocarina of Time remake official trailer');
-  assert.ok(countWords(prompt) <= 9);
+  assert.ok(countWords(prompt) <= 12);
   assert.ok(prompt.length > 0);
 });
 
