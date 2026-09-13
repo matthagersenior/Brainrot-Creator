@@ -33,6 +33,35 @@ export const VISUAL_STYLE_PRESETS = Object.freeze({
   }),
 });
 
+export const MICRO_SHOTS_PER_SCENE = 4;
+
+const MICRO_SHOT_MOTION_PRESETS = Object.freeze({
+  'cursed-real': Object.freeze([
+    Object.freeze({ zoomStart: 1.035, zoomEnd: 1.075, panXStart: -7, panXEnd: 8, panYStart: 4, panYEnd: -4, rotationStart: -0.08, rotationEnd: 0.10 }),
+    Object.freeze({ zoomStart: 1.075, zoomEnd: 1.105, panXStart: 8, panXEnd: -5, panYStart: -3, panYEnd: 5, rotationStart: 0.10, rotationEnd: -0.06 }),
+    Object.freeze({ zoomStart: 1.105, zoomEnd: 1.065, panXStart: -5, panXEnd: 6, panYStart: 5, panYEnd: 0, rotationStart: -0.06, rotationEnd: 0.07 }),
+    Object.freeze({ zoomStart: 1.065, zoomEnd: 1.10, panXStart: 6, panXEnd: 0, panYStart: 0, panYEnd: -5, rotationStart: 0.07, rotationEnd: 0 }),
+  ]),
+  photoreal: Object.freeze([
+    Object.freeze({ zoomStart: 1.025, zoomEnd: 1.06, panXStart: -4, panXEnd: 5, panYStart: 2, panYEnd: -2, rotationStart: -0.03, rotationEnd: 0.03 }),
+    Object.freeze({ zoomStart: 1.06, zoomEnd: 1.085, panXStart: 5, panXEnd: 0, panYStart: -2, panYEnd: 3, rotationStart: 0.03, rotationEnd: 0 }),
+    Object.freeze({ zoomStart: 1.085, zoomEnd: 1.05, panXStart: 0, panXEnd: -5, panYStart: 3, panYEnd: 0, rotationStart: 0, rotationEnd: -0.03 }),
+    Object.freeze({ zoomStart: 1.05, zoomEnd: 1.085, panXStart: -5, panXEnd: 4, panYStart: 0, panYEnd: -3, rotationStart: -0.03, rotationEnd: 0.02 }),
+  ]),
+  cinematic: Object.freeze([
+    Object.freeze({ zoomStart: 1.04, zoomEnd: 1.095, panXStart: -10, panXEnd: 8, panYStart: 5, panYEnd: -6, rotationStart: -0.18, rotationEnd: 0.12 }),
+    Object.freeze({ zoomStart: 1.095, zoomEnd: 1.13, panXStart: 8, panXEnd: -8, panYStart: -6, panYEnd: 3, rotationStart: 0.12, rotationEnd: -0.10 }),
+    Object.freeze({ zoomStart: 1.13, zoomEnd: 1.075, panXStart: -8, panXEnd: 10, panYStart: 3, panYEnd: 0, rotationStart: -0.10, rotationEnd: 0.15 }),
+    Object.freeze({ zoomStart: 1.075, zoomEnd: 1.12, panXStart: 10, panXEnd: 0, panYStart: 0, panYEnd: -7, rotationStart: 0.15, rotationEnd: 0 }),
+  ]),
+  cartoon: Object.freeze([
+    Object.freeze({ zoomStart: 1.055, zoomEnd: 1.15, panXStart: -18, panXEnd: 20, panYStart: 8, panYEnd: -10, rotationStart: -0.9, rotationEnd: 1.4 }),
+    Object.freeze({ zoomStart: 1.15, zoomEnd: 1.09, panXStart: 20, panXEnd: -16, panYStart: -10, panYEnd: 12, rotationStart: 1.4, rotationEnd: -1.7 }),
+    Object.freeze({ zoomStart: 1.09, zoomEnd: 1.18, panXStart: -16, panXEnd: 14, panYStart: 12, panYEnd: -5, rotationStart: -1.7, rotationEnd: 2.1 }),
+    Object.freeze({ zoomStart: 1.18, zoomEnd: 1.10, panXStart: 14, panXEnd: 0, panYStart: -5, panYEnd: 0, rotationStart: 2.1, rotationEnd: -0.4 }),
+  ]),
+});
+
 const BLOCKED_TREND_TERMS = [
   'shooting', 'shooter', 'murder', 'murdered', 'killed', 'death', 'dead', 'dies', 'died',
   'obituary', 'funeral', 'rape', 'assault', 'abuse', 'war', 'invasion', 'missile', 'bomb',
@@ -272,6 +301,43 @@ export function buildSceneTimeline(scenes = [], totalSeconds = TARGET_SECONDS) {
     cursor = index === scenes.length - 1 ? totalSeconds : start + duration;
     return { ...scene, start, end: cursor, duration: cursor - start };
   });
+}
+
+export function buildMicroShotTimeline(sceneTimeline = [], visualStyleValue = 'cursed-real') {
+  if (!Array.isArray(sceneTimeline) || sceneTimeline.length === 0) return [];
+  const visualStyle = normalizeVisualStyle(visualStyleValue);
+  const motions = MICRO_SHOT_MOTION_PRESETS[visualStyle] || MICRO_SHOT_MOTION_PRESETS['cursed-real'];
+  const shots = [];
+
+  sceneTimeline.forEach((scene, sceneIndex) => {
+    const sceneStart = Number(scene?.start) || 0;
+    const sceneEnd = Number(scene?.end);
+    const safeSceneEnd = Number.isFinite(sceneEnd) ? Math.max(sceneStart, sceneEnd) : sceneStart;
+    const sceneDuration = safeSceneEnd - sceneStart;
+
+    for (let shotIndex = 0; shotIndex < MICRO_SHOTS_PER_SCENE; shotIndex += 1) {
+      const start = shotIndex === 0
+        ? sceneStart
+        : sceneStart + (sceneDuration * shotIndex) / MICRO_SHOTS_PER_SCENE;
+      const end = shotIndex === MICRO_SHOTS_PER_SCENE - 1
+        ? safeSceneEnd
+        : sceneStart + (sceneDuration * (shotIndex + 1)) / MICRO_SHOTS_PER_SCENE;
+      shots.push({
+        ...scene,
+        sceneIndex,
+        shotIndex,
+        sourceImageIndex: sceneIndex,
+        visualStyle,
+        start,
+        end,
+        duration: end - start,
+        transitionFromSceneIndex: shotIndex === 0 && sceneIndex > 0 ? sceneIndex - 1 : null,
+        motion: { ...motions[shotIndex % motions.length] },
+      });
+    }
+  });
+
+  return shots;
 }
 
 export function isSafeTrend(value = '') {
