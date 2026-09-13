@@ -4,8 +4,10 @@ const JSON_HEADERS = {
 };
 
 const HORDE_BASE = 'https://aihorde.net/api/v2';
+const POLLINATIONS_BASE = 'https://image.pollinations.ai/prompt';
 const ANON_KEY = '0000000000';
 const CLIENT_AGENT = 'brainrot-creator:1.0:github.com/matthagersenior/Brainrot-Creator';
+const POLLINATIONS_MODELS = new Set(['flux', 'zimage']);
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
@@ -24,6 +26,11 @@ function safeSeed(value) {
   return Number.isFinite(parsed) ? String(Math.max(1, Math.min(2_147_483_647, parsed))) : '1';
 }
 
+function safeModel(value) {
+  const model = String(value || 'flux').trim().toLowerCase();
+  return POLLINATIONS_MODELS.has(model) ? model : 'flux';
+}
+
 function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -35,6 +42,56 @@ function bytesToBase64(bytes) {
     binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
   }
   return btoa(binary);
+}
+
+async function pollinationsGenerate(visualPrompt, seed, model) {
+  const params = new URLSearchParams({
+    model,
+    width: '576',
+    height: '1024',
+    seed: String(seed),
+    enhance: 'true',
+    safe: 'true',
+    private: 'true',
+    nologo: 'true',
+  });
+  const url = `${POLLINATIONS_BASE}/${encodeURIComponent(visualPrompt)}?${params}`;
+
+  let response;
+  try {
+    response = await fetch(url, {
+      headers: {
+        accept: 'image/jpeg,image/png,image/webp,image/*',
+        'user-agent': 'ROT-MACHINE-Brainrot-Creator/1.0',
+      },
+    });
+  } catch (error) {
+    return json({ error: 'POLLINATIONS_FETCH_FAILED', detail: String(error?.message || error).slice(0, 240), model }, 502);
+  }
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '');
+    return json({ error: 'POLLINATIONS_FAILED', detail: detail.slice(0, 240) || `HTTP ${response.status}`, model }, 502);
+  }
+
+  const contentType = response.headers.get('content-type') || 'image/jpeg';
+  if (!contentType.startsWith('image/')) {
+    const detail = await response.text().catch(() => '');
+    return json({ error: 'POLLINATIONS_NON_IMAGE', detail: detail.slice(0, 240), model }, 502);
+  }
+
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (bytes.length < 10_000) {
+    return json({ error: 'POLLINATIONS_TINY_IMAGE', detail: `${bytes.length} bytes`, model }, 502);
+  }
+
+  return json({
+    dataURI: `data:${contentType};base64,${bytesToBase64(bytes)}`,
+    source: `Pollinations · ${model === 'flux' ? 'FLUX' : 'Z-Image'}`,
+    model,
+    seed,
+    bytes: bytes.length,
+  });
 }
 
 async function hordeFetch(path, init = {}) {
@@ -56,18 +113,7 @@ async function imageToDataURI(img) {
   return `data:${contentType};base64,${bytesToBase64(bytes)}`;
 }
 
-export async function onRequestPost({ request, env = {} }) {
-  let payload;
-  try {
-    payload = await request.json();
-  } catch {
-    return json({ error: 'INVALID_JSON' }, 400);
-  }
-
-  const visualPrompt = safeText(payload?.visualPrompt);
-  const seed = safeSeed(payload?.seed);
-  if (!visualPrompt) return json({ error: 'VISUAL_PROMPT_REQUIRED' }, 400);
-
+async function hordeGenerate(visualPrompt, seed, env) {
   const timeoutMs = Math.max(5_000, Number(env.HORDE_TIMEOUT_MS) || 42_000);
   const pollMs = Math.max(250, Number(env.HORDE_POLL_INTERVAL_MS) || 2_000);
 
@@ -139,4 +185,23 @@ export async function onRequestPost({ request, env = {} }) {
 
   hordeFetch(`/generate/status/${id}`, { method: 'DELETE' }).catch(() => {});
   return json({ error: 'HORDE_TIMEOUT', detail: 'anonymous community queue did not finish in time' }, 504);
+}
+
+export async function onRequestPost({ request, env = {} }) {
+  let payload;
+  try {
+    payload = await request.json();
+  } catch {
+    return json({ error: 'INVALID_JSON' }, 400);
+  }
+
+  const visualPrompt = safeText(payload?.visualPrompt);
+  const seed = safeSeed(payload?.seed);
+  if (!visualPrompt) return json({ error: 'VISUAL_PROMPT_REQUIRED' }, 400);
+
+  if (String(payload?.provider || '').toLowerCase() === 'pollinations') {
+    return pollinationsGenerate(visualPrompt, seed, safeModel(payload?.model));
+  }
+
+  return hordeGenerate(visualPrompt, seed, env);
 }
