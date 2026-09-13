@@ -1,10 +1,10 @@
 {
-  "id": "/",
+  "id": "./",
   "name": "ROT MACHINE — Brainrot Creator",
   "short_name": "ROT MACHINE",
   "description": "Create one-minute AI Brainrot shorts with linked motion shots, automatic voice casting, subtitles, and downloadable video.",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "display_override": [
     "window-controls-overlay",
@@ -20,13 +20,13 @@
   ],
   "icons": [
     {
-      "src": "/icons/icon-192.png",
+      "src": "./icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icons/icon-512.png",
+      "src": "./icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
@@ -37,10 +37,10 @@
       "name": "Create a Brainrot",
       "short_name": "Create",
       "description": "Start a new one-minute Brainrot short",
-      "url": "/?action=create",
+      "url": "./?action=create",
       "icons": [
         {
-          "src": "/icons/icon-192.png",
+          "src": "./icons/icon-192.png",
           "sizes": "192x192",
           "type": "image/png"
         }
