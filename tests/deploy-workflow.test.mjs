@@ -22,19 +22,20 @@ test('production smoke test waits for the new Cloudflare alias content before AP
   assert.match(workflow, /sleep 2/);
 });
 
-test('production smoke test requires a real FLUX image before slower Gemini checks', async () => {
+test('production visual smoke check requires real FLUX output unless the free daily allocation is explicitly exhausted', async () => {
   const workflow = await workflowText();
   const visualIndex = workflow.indexOf('visual_status=');
   const storyIndex = workflow.indexOf('story_status=');
 
   assert.ok(visualIndex > 0, 'visual smoke check should exist');
   assert.ok(storyIndex > visualIndex, 'visual check should run before story generation');
-  assert.match(workflow, /if \[\[ "\$visual_status" != "200" \]\]; then/);
-  assert.match(workflow, /Workers AI scene visual endpoint failed with HTTP/);
+  assert.match(workflow, /if \[\[ "\$visual_status" == "200" \]\]; then/);
   assert.match(workflow, /data:image\/jpeg;base64,/);
+  assert.match(workflow, /daily free allocation/);
+  assert.match(workflow, /quota-exhaustion fallback contract passed/);
+  assert.match(workflow, /failed unexpectedly with HTTP/);
   assert.doesNotMatch(workflow, /Workers AI binding is present but image generation is temporarily unavailable/);
 });
-
 
 test('production narration smoke check requires story-matched dual-voice metadata', async () => {
   const workflow = await workflowText();
