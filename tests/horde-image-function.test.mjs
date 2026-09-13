@@ -63,3 +63,34 @@ test('anonymous AI Horde fallback rejects empty prompts', async () => {
   assert.equal(response.status, 400);
   assert.equal(body.error, 'VISUAL_PROMPT_REQUIRED');
 });
+
+
+test('proven image broker route serves high-resolution Pollinations FLUX without creating a new Pages route', async () => {
+  const originalFetch = globalThis.fetch;
+  let calledUrl = '';
+  globalThis.fetch = async url => {
+    calledUrl = String(url);
+    return new Response(new Uint8Array(12_000).fill(9), {
+      status: 200,
+      headers: { 'content-type': 'image/jpeg' },
+    });
+  };
+
+  try {
+    const response = await onRequestPost({
+      request: req({ provider: 'pollinations', model: 'flux' }),
+      env: {},
+    });
+    const body = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.match(calledUrl, /^https:\/\/image\.pollinations\.ai\/prompt\//);
+    assert.match(calledUrl, /model=flux/);
+    assert.match(calledUrl, /width=576/);
+    assert.match(calledUrl, /height=1024/);
+    assert.equal(body.source, 'Pollinations · FLUX');
+    assert.match(body.dataURI, /^data:image\/jpeg;base64,/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
