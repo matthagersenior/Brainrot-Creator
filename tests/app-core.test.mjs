@@ -10,6 +10,8 @@ import {
   normalizeScenes,
   normalizeVisualStyle,
   getVisualStylePreset,
+  MICRO_SHOTS_PER_SCENE,
+  buildMicroShotTimeline,
 } from '../app-core.mjs';
 
 test('countWords and validatePrompt enforce nine-word limit', () => {
@@ -81,4 +83,48 @@ test('trendToPrompt stays within nine words', () => {
   const prompt = trendToPrompt('Nintendo Ocarina of Time remake official trailer');
   assert.ok(countWords(prompt) <= 9);
   assert.ok(prompt.length > 0);
+});
+
+
+test('all visual styles expand eight story beats into thirty-two linked micro-shots without extra image keyframes', () => {
+  const styles = ['cursed-real', 'photoreal', 'cinematic', 'cartoon'];
+
+  for (const style of styles) {
+    const story = buildFallbackStory('frog at the DMV', style);
+    const sceneTimeline = buildSceneTimeline(story.scenes, 60);
+    const shots = buildMicroShotTimeline(sceneTimeline, style);
+
+    assert.equal(MICRO_SHOTS_PER_SCENE, 4);
+    assert.equal(shots.length, 32);
+    assert.equal(shots[0].start, 0);
+    assert.equal(shots.at(-1).end, 60);
+
+    for (let index = 1; index < shots.length; index += 1) {
+      assert.equal(shots[index - 1].end, shots[index].start);
+    }
+
+    for (let sceneIndex = 0; sceneIndex < 8; sceneIndex += 1) {
+      const group = shots.filter(shot => shot.sceneIndex === sceneIndex);
+      assert.equal(group.length, 4);
+      assert.deepEqual(group.map(shot => shot.shotIndex), [0, 1, 2, 3]);
+      assert.deepEqual([...new Set(group.map(shot => shot.sourceImageIndex))], [sceneIndex]);
+      assert.ok(group.every(shot => shot.visualStyle === style));
+      assert.ok(group.every(shot => shot.motion && Number.isFinite(shot.motion.zoomStart)));
+      assert.ok(group.every(shot => shot.motion && Number.isFinite(shot.motion.zoomEnd)));
+    }
+  }
+});
+
+test('linked micro-shots preserve beat-to-beat continuity and style-specific motion language', () => {
+  const story = buildFallbackStory('frog at the DMV', 'cursed-real');
+  const sceneTimeline = buildSceneTimeline(story.scenes, 60);
+  const realistic = buildMicroShotTimeline(sceneTimeline, 'cursed-real');
+  const cartoon = buildMicroShotTimeline(sceneTimeline, 'cartoon');
+
+  assert.equal(realistic[4].sceneIndex, 1);
+  assert.equal(realistic[4].transitionFromSceneIndex, 0);
+  assert.equal(realistic[4].sourceImageIndex, 1);
+  assert.equal(realistic[3].sourceImageIndex, 0);
+  assert.notDeepEqual(realistic[0].motion, cartoon[0].motion);
+  assert.ok(cartoon.some(shot => Math.abs(shot.motion.rotationEnd) > Math.abs(realistic[0].motion.rotationEnd)));
 });
