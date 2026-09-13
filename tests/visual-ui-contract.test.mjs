@@ -21,3 +21,12 @@ test('client requests scene images and renders image-backed frames', async () =>
   assert.match(app, /drawImage/);
   assert.match(app, /visualStyleSelect/);
 });
+
+test('client drives playback through linked micro-shots while reusing the eight AI keyframes', async () => {
+  const app = await readFile(new URL('app.mjs', root), 'utf8');
+  assert.match(app, /buildMicroShotTimeline/);
+  assert.match(app, /microTimeline/);
+  assert.match(app, /microShotStateAtTime/);
+  assert.match(app, /motion\.zoomStart/);
+  assert.match(app, /transitionFromSceneIndex/);
+});

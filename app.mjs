@@ -5,6 +5,7 @@ import {
   buildFallbackStory,
   normalizeScenes,
   buildSceneTimeline,
+  buildMicroShotTimeline,
   isSafeTrend,
   trendToPrompt,
   captionWindow,
@@ -51,6 +52,7 @@ const state = {
   trendSource: 'built-in rotation',
   story: null,
   timeline: [],
+  microTimeline: [],
   storySource: 'local fallback',
   voiceSource: 'device voice',
   visualSource: 'cinematic fallback',
@@ -305,6 +307,7 @@ async function generate(promptValue) {
   state.audioBuffer = null;
   state.story = null;
   state.timeline = [];
+  state.microTimeline = [];
   state.sceneImages = [];
   state.visualStyle = visualStyle;
   state.storySource = 'local fallback';
@@ -329,6 +332,7 @@ async function generate(promptValue) {
   const scenes = normalizeScenes(generated.scenes, validation.prompt, visualStyle, continuity);
   state.story = { scenes, prompt: validation.prompt, continuity, visualStyle };
   state.timeline = buildSceneTimeline(scenes, TARGET_SECONDS);
+  state.microTimeline = buildMicroShotTimeline(state.timeline, visualStyle);
   scriptWordsEl.textContent = storyWordCount(scenes);
   sceneCountEl.textContent = scenes.length;
   videoLengthEl.textContent = '60s';
@@ -357,9 +361,9 @@ async function generate(promptValue) {
   updateWordMeter();
   updatePlaybackControls();
   if (readyImages === scenes.length) {
-    setStatus('Ready. All eight story beats have AI scene images plus narration.', 'ok');
+    setStatus('Ready. Eight AI keyframes drive 32 linked motion shots plus narration.', 'ok');
   } else if (readyImages > 0) {
-    setStatus(`Ready. ${readyImages}/8 scenes have AI images; the rest use the cinematic story fallback.`, 'ok');
+    setStatus(`Ready. ${readyImages}/8 AI keyframes are live; 32 linked motion shots still cover the full minute.`, 'ok');
   } else {
     setStatus('Ready. Image AI was unavailable, so every scene uses the story-matched cinematic fallback.', 'warn');
   }
@@ -525,11 +529,21 @@ function chaosFactor() {
   return { chill: 0.55, cooked: 0.85, nuclear: 1.08 }[chaosSelect.value] || 0.85;
 }
 
+function microShotStateAtTime(seconds) {
+  const timeline = state.microTimeline;
+  if (!timeline.length) return null;
+  let shot = timeline.find(item => seconds >= item.start && seconds < item.end);
+  if (!shot) shot = timeline[timeline.length - 1];
+  const progress = Math.max(0, Math.min(1, (seconds - shot.start) / Math.max(shot.duration, .001)));
+  return { shot, progress };
+}
+
 function sceneStateAtTime(seconds) {
   const timeline = state.timeline;
   if (!timeline.length) return null;
   let sceneIndex = timeline.findIndex(scene => seconds >= scene.start && seconds < scene.end);
   if (sceneIndex < 0) sceneIndex = timeline.length - 1;
+  const microState = microShotStateAtTime(seconds);
   const scene = timeline[sceneIndex];
   const words = scene.text.trim().split(/\s+/);
   let localWordIndex = Math.min(words.length - 1, Math.floor(((seconds - scene.start) / Math.max(scene.duration, .001)) * words.length));
@@ -539,10 +553,24 @@ function sceneStateAtTime(seconds) {
     if (mapped) {
       sceneIndex = mapped.sceneIndex;
       localWordIndex = mapped.localIndex;
-      return { scene: timeline[sceneIndex], sceneIndex, words: timeline[sceneIndex].text.trim().split(/\s+/), localWordIndex };
+      return {
+        scene: timeline[sceneIndex],
+        sceneIndex,
+        words: timeline[sceneIndex].text.trim().split(/\s+/),
+        localWordIndex,
+        microShot: microState?.shot || null,
+        microProgress: microState?.progress ?? 0,
+      };
     }
   }
-  return { scene, sceneIndex, words, localWordIndex };
+  return {
+    scene,
+    sceneIndex,
+    words,
+    localWordIndex,
+    microShot: microState?.shot || null,
+    microProgress: microState?.progress ?? 0,
+  };
 }
 
 function roundedRect(x, y, w, h, radius) {
@@ -551,7 +579,16 @@ function roundedRect(x, y, w, h, radius) {
   ctx.roundRect(x, y, w, h, r);
 }
 
-function drawImageCover(image, progress, sceneIndex) {
+function easeMotion(value) {
+  const t = Math.max(0, Math.min(1, value));
+  return t * t * (3 - 2 * t);
+}
+
+function lerp(start, end, amount) {
+  return start + (end - start) * amount;
+}
+
+function drawImageCover(image, motion, progress) {
   const canvasRatio = canvas.width / canvas.height;
   const imageRatio = image.naturalWidth / image.naturalHeight;
   let sx = 0, sy = 0, sw = image.naturalWidth, sh = image.naturalHeight;
@@ -562,12 +599,53 @@ function drawImageCover(image, progress, sceneIndex) {
     sh = image.naturalWidth / canvasRatio;
     sy = (image.naturalHeight - sh) / 2;
   }
-  const zoom = 1.03 + progress * 0.07;
+
+  const t = easeMotion(progress);
+  const zoom = lerp(motion.zoomStart, motion.zoomEnd, t);
+  const panX = lerp(motion.panXStart, motion.panXEnd, t);
+  const panY = lerp(motion.panYStart, motion.panYEnd, t);
+  const rotation = lerp(motion.rotationStart, motion.rotationEnd, t) * Math.PI / 180;
   const dw = canvas.width * zoom;
   const dh = canvas.height * zoom;
-  const driftX = Math.sin(sceneIndex * 1.7 + progress * Math.PI) * 18;
-  const driftY = Math.cos(sceneIndex * 1.2 + progress * Math.PI * .7) * 12;
-  ctx.drawImage(image, sx, sy, sw, sh, (canvas.width - dw) / 2 + driftX, (canvas.height - dh) / 2 + driftY, dw, dh);
+
+  ctx.save();
+  ctx.translate(canvas.width / 2, canvas.height / 2);
+  ctx.rotate(rotation);
+  ctx.drawImage(image, sx, sy, sw, sh, -dw / 2 + panX, -dh / 2 + panY, dw, dh);
+  ctx.restore();
+}
+
+function drawLinkedVisual(scene, sceneIndex, microShot, microProgress, sceneProgress) {
+  const sourceImageIndex = microShot?.sourceImageIndex ?? sceneIndex;
+  const image = state.sceneImages[sourceImageIndex];
+  if (!image || !microShot?.motion) {
+    drawCinematicFallback(scene, sceneIndex, microShot ? microProgress : sceneProgress);
+    return;
+  }
+
+  const transitionFromSceneIndex = microShot.transitionFromSceneIndex;
+  const previousImage = Number.isInteger(transitionFromSceneIndex)
+    ? state.sceneImages[transitionFromSceneIndex]
+    : null;
+  const crossfadeWindow = 0.22;
+
+  if (previousImage && microProgress < crossfadeWindow) {
+    const previousShot = state.microTimeline
+      .filter(item => item.sceneIndex === transitionFromSceneIndex)
+      .slice(-1)[0];
+    ctx.save();
+    ctx.globalAlpha = 1;
+    drawImageCover(previousImage, previousShot?.motion || microShot.motion, 1);
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = easeMotion(microProgress / crossfadeWindow);
+    drawImageCover(image, microShot.motion, microProgress);
+    ctx.restore();
+    return;
+  }
+
+  drawImageCover(image, microShot.motion, microProgress);
 }
 
 function drawCinematicFallback(scene, sceneIndex, progress) {
@@ -682,16 +760,14 @@ function drawFrame(seconds) {
   }
   const frame = sceneStateAtTime(Math.min(TARGET_SECONDS - 0.0001, Math.max(0, seconds)));
   if (!frame) return;
-  const { scene, sceneIndex, words, localWordIndex } = frame;
+  const { scene, sceneIndex, words, localWordIndex, microShot, microProgress } = frame;
   const progress = Math.max(0, Math.min(1, (seconds - scene.start) / Math.max(scene.duration, .001)));
   const factor = chaosFactor();
 
   ctx.save();
   ctx.fillStyle = '#05070a';
   ctx.fillRect(0, 0, 720, 1280);
-  const image = state.sceneImages[sceneIndex];
-  if (image) drawImageCover(image, progress, sceneIndex);
-  else drawCinematicFallback(scene, sceneIndex, progress);
+  drawLinkedVisual(scene, sceneIndex, microShot, microProgress, progress);
 
   const vignette = ctx.createRadialGradient(360, 540, 220, 360, 600, 760);
   vignette.addColorStop(0, 'rgba(0,0,0,0)');
@@ -713,7 +789,8 @@ function drawFrame(seconds) {
   ctx.fillStyle = '#ffffff';
   ctx.font = '850 20px ui-sans-serif, system-ui, sans-serif';
   ctx.textAlign = 'left';
-  ctx.fillText(`SCENE ${sceneIndex + 1}/8`, 54, 61);
+  const shotLabel = microShot ? ` · SHOT ${microShot.shotIndex + 1}/4` : '';
+  ctx.fillText(`SCENE ${sceneIndex + 1}/8${shotLabel}`, 54, 61);
   ctx.fillStyle = scene.color;
   ctx.font = '900 25px Impact, Arial Black, sans-serif';
   ctx.fillText(scene.burst, 54, 91);
@@ -758,10 +835,10 @@ function drawWelcome(label = 'READY TO ROT') {
   ctx.fillText('ROT MACHINE', 360, 825);
   ctx.fillStyle = 'rgba(255,255,255,.7)';
   ctx.font = '700 29px ui-sans-serif, system-ui, sans-serif';
-  ctx.fillText('8 scenes • realistic image mode • 60 seconds', 360, 900);
+  ctx.fillText('8 AI keyframes • 32 linked shots • 60 seconds', 360, 900);
   ctx.fillStyle = 'rgba(255,255,255,.48)';
   ctx.font = '650 23px ui-sans-serif, system-ui, sans-serif';
-  ctx.fillText('The story plans the shots before the renderer moves.', 360, 952);
+  ctx.fillText('Each beat flows through four motion-linked shots.', 360, 952);
 }
 
 promptInput.addEventListener('input', updateWordMeter);
