@@ -1,6 +1,8 @@
 export const MAX_PROMPT_WORDS = 9;
 export const TARGET_SECONDS = 60;
 export const SCENE_COUNT = 8;
+export const MICRO_SHOTS_PER_SCENE = 4;
+export const TOTAL_MICRO_SHOTS = SCENE_COUNT * MICRO_SHOTS_PER_SCENE;
 
 const PALETTE = ['#d4845f', '#6688a8', '#9a7c63', '#5f7c6d', '#8b6d8f', '#b08b57', '#5f767d', '#8a665f'];
 const MODIFIERS = [
@@ -301,6 +303,72 @@ export function buildSceneTimeline(scenes = [], totalSeconds = TARGET_SECONDS) {
     cursor = index === scenes.length - 1 ? totalSeconds : start + duration;
     return { ...scene, start, end: cursor, duration: cursor - start };
   });
+}
+
+
+const MICRO_SHOT_MOTION = Object.freeze({
+  'cursed-real': Object.freeze([
+    Object.freeze({ zoomStart: 1.015, zoomEnd: 1.050, xStart: -10, xEnd: 8, yStart: 6, yEnd: -4, rotationStart: -0.08, rotationEnd: 0.06 }),
+    Object.freeze({ zoomStart: 1.050, zoomEnd: 1.080, xStart: 8, xEnd: -6, yStart: -4, yEnd: 3, rotationStart: 0.06, rotationEnd: -0.05 }),
+    Object.freeze({ zoomStart: 1.080, zoomEnd: 1.105, xStart: -6, xEnd: 5, yStart: 3, yEnd: -7, rotationStart: -0.05, rotationEnd: 0.04 }),
+    Object.freeze({ zoomStart: 1.105, zoomEnd: 1.125, xStart: 5, xEnd: 0, yStart: -7, yEnd: 0, rotationStart: 0.04, rotationEnd: 0 }),
+  ]),
+  photoreal: Object.freeze([
+    Object.freeze({ zoomStart: 1.010, zoomEnd: 1.040, xStart: -8, xEnd: 5, yStart: 4, yEnd: -3, rotationStart: -0.04, rotationEnd: 0.03 }),
+    Object.freeze({ zoomStart: 1.040, zoomEnd: 1.065, xStart: 5, xEnd: -4, yStart: -3, yEnd: 2, rotationStart: 0.03, rotationEnd: -0.03 }),
+    Object.freeze({ zoomStart: 1.065, zoomEnd: 1.085, xStart: -4, xEnd: 4, yStart: 2, yEnd: -5, rotationStart: -0.03, rotationEnd: 0.02 }),
+    Object.freeze({ zoomStart: 1.085, zoomEnd: 1.100, xStart: 4, xEnd: 0, yStart: -5, yEnd: 0, rotationStart: 0.02, rotationEnd: 0 }),
+  ]),
+  cinematic: Object.freeze([
+    Object.freeze({ zoomStart: 1.020, zoomEnd: 1.065, xStart: -16, xEnd: 10, yStart: 7, yEnd: -5, rotationStart: -0.10, rotationEnd: 0.08 }),
+    Object.freeze({ zoomStart: 1.065, zoomEnd: 1.105, xStart: 10, xEnd: -9, yStart: -5, yEnd: 4, rotationStart: 0.08, rotationEnd: -0.07 }),
+    Object.freeze({ zoomStart: 1.105, zoomEnd: 1.135, xStart: -9, xEnd: 7, yStart: 4, yEnd: -8, rotationStart: -0.07, rotationEnd: 0.06 }),
+    Object.freeze({ zoomStart: 1.135, zoomEnd: 1.155, xStart: 7, xEnd: 0, yStart: -8, yEnd: 0, rotationStart: 0.06, rotationEnd: 0 }),
+  ]),
+  cartoon: Object.freeze([
+    Object.freeze({ zoomStart: 1.025, zoomEnd: 1.090, xStart: -22, xEnd: 16, yStart: 10, yEnd: -8, rotationStart: -0.55, rotationEnd: 0.80 }),
+    Object.freeze({ zoomStart: 1.090, zoomEnd: 1.145, xStart: 16, xEnd: -18, yStart: -8, yEnd: 9, rotationStart: 0.80, rotationEnd: -0.95 }),
+    Object.freeze({ zoomStart: 1.145, zoomEnd: 1.185, xStart: -18, xEnd: 13, yStart: 9, yEnd: -12, rotationStart: -0.95, rotationEnd: 0.70 }),
+    Object.freeze({ zoomStart: 1.185, zoomEnd: 1.205, xStart: 13, xEnd: 0, yStart: -12, yEnd: 0, rotationStart: 0.70, rotationEnd: 0 }),
+  ]),
+});
+
+export function buildMicroShotTimeline(sceneTimeline = [], visualStyleValue = 'cursed-real') {
+  if (!Array.isArray(sceneTimeline) || sceneTimeline.length === 0) return [];
+  const visualStyle = normalizeVisualStyle(visualStyleValue);
+  const motionSet = MICRO_SHOT_MOTION[visualStyle] || MICRO_SHOT_MOTION['cursed-real'];
+  const shots = [];
+
+  sceneTimeline.forEach((scene, sceneIndex) => {
+    const sceneDuration = Math.max(0, Number(scene?.duration) || (Number(scene?.end) - Number(scene?.start)) || 0);
+    const sceneStart = Number(scene?.start) || 0;
+    const shotDuration = sceneDuration / MICRO_SHOTS_PER_SCENE;
+
+    for (let shotIndex = 0; shotIndex < MICRO_SHOTS_PER_SCENE; shotIndex += 1) {
+      const start = sceneStart + shotDuration * shotIndex;
+      const end = shotIndex === MICRO_SHOTS_PER_SCENE - 1
+        ? Number(scene?.end)
+        : sceneStart + shotDuration * (shotIndex + 1);
+      const previousGlobalShotIndex = shots.length ? shots.length - 1 : null;
+      shots.push({
+        sceneIndex,
+        shotIndex,
+        globalShotIndex: shots.length,
+        sourceImageIndex: sceneIndex,
+        transitionFromSceneIndex: shotIndex === 0 && sceneIndex > 0 ? sceneIndex - 1 : sceneIndex,
+        transitionFromGlobalShotIndex: previousGlobalShotIndex,
+        start,
+        end,
+        duration: end - start,
+        visualStyle,
+        phase: ['establish', 'push', 'reaction', 'handoff'][shotIndex],
+        transitionBlend: shotIndex === 0 && sceneIndex > 0 ? 0.28 : 0,
+        motion: { ...motionSet[shotIndex] },
+      });
+    }
+  });
+
+  return shots;
 }
 
 export function buildMicroShotTimeline(sceneTimeline = [], visualStyleValue = 'cursed-real') {
