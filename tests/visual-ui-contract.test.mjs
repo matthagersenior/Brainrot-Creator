@@ -137,3 +137,16 @@ test('quality-first image fallback uses Pollinations ahead of emergency Horde an
   assert.match(app, /scheduled nearest-anchor reuse/);
   assert.match(app, /do not visualize abstract words or concepts/);
 });
+
+
+test('playback keeps voice cadence natural and uses film-style transitions instead of colored story cards', async () => {
+  const app = await readFile(new URL('app.mjs', root), 'utf8');
+
+  assert.match(app, /naturalNarrationTiming/);
+  assert.match(app, /narrationPlaybackRate/);
+  assert.doesNotMatch(app, /audioBuffer\.duration\s*\/\s*TARGET_SECONDS/);
+  assert.match(app, /drawSceneTransition/);
+  assert.match(app, /transitionWindow\s*=\s*0\.42/);
+  assert.match(app, /blur\(/);
+  assert.doesNotMatch(app, /STORY SHOT/);
+});
