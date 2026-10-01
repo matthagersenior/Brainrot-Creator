@@ -10,7 +10,7 @@ The renderer is scene-driven instead of effect-driven:
 2. The story response includes a continuity profile for the recurring subject/world.
 3. Every scene gets its own subject, setting, action, camera, mood, and text-to-image prompt.
 4. Cloudflare Workers AI tries to generate a scene image with FLUX.1 Schnell.
-5. The browser animates each scene image with restrained push/pan motion and draws synchronized captions over it.
+5. The browser animates each scene image with restrained push/pan motion, film-style scene transitions, and phrase-stable synchronized captions over it.
 6. If image generation is unavailable for a scene, the canvas uses a story-matched cinematic fallback that shows that scene's planned setting/action instead of unrelated emoji graphics.
 
 Visual modes:
@@ -103,7 +103,7 @@ npm test
 
 The visible preview is a real `720x1280` Canvas render. Scene images, camera motion, captions, scene labels, and progress are composited into the canvas rather than overlaid with HTML. When Gemini TTS and browser recording APIs are available, the same canvas is captured at 30 fps and combined with the WebAudio narration stream.
 
-Narration playback is normalized against the generated audio duration so the exported short targets exactly 60 seconds.
+Narration playback stays close to the generated voice's natural cadence. Mild timing correction keeps unusually long or short reads usable, while the 60-second canvas can hold the final visual beat after the voice finishes.
 
 ## Safety / parody behavior
 
