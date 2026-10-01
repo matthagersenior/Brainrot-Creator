@@ -26,32 +26,26 @@
   <p id="installHint" class="install-hint" aria-live="polite">Install ROT MACHINE on your phone, tablet, or laptop for a standalone app experience.</p>
   <main class="app-shell flow-shell">
     <section id="createView" class="app-view create-view" aria-labelledby="creatorTitle">
-      <header class="hero create-hero">
-        <div class="brand-row">
-          <h1 class="brand">ROT MACHINE</h1>
-          <span class="free-badge">$0-FIRST MODE</span>
-        </div>
-        <p class="tagline">A richer prompt in. One minute of AI-written, multi-voice, subtitled, story-matched chaos out.</p>
-      </header>
-
       <section class="panel creator-panel create-card">
-        <h2 id="creatorTitle">COOK THE ROT</h2>
-        <p class="panel-copy">Describe the idea, characters, setting, or twist in up to 60 words. Pick the look and energy; ROT MACHINE handles story structure, automatic voice casting, linked shots, subtitles, and export.</p>
+        <div class="creator-head">
+          <h1 id="creatorTitle">COOK THE ROT</h1>
+          <span class="free-badge">$0-FIRST</span>
+        </div>
 
         <div class="trend-head">
-          <strong>TRENDING ROT 🔥</strong>
-          <span id="trendSource" class="trend-source">loading rotation…</span>
+          <strong>TRENDING 🔥</strong>
+          <span id="trendSource" class="trend-source">loading…</span>
         </div>
         <div id="trendRail" class="trend-rail" aria-label="Trending prompt starters"></div>
 
         <div class="prompt-wrap">
-          <textarea id="promptInput" maxlength="500" rows="5" placeholder="Example: A nervous frog goes to the DMV for a license renewal while the WiFi becomes sentient and the clerk treats everything as normal." aria-label="Brainrot prompt"></textarea>
+          <textarea id="promptInput" maxlength="500" rows="8" placeholder="What should happen?" aria-label="Brainrot prompt"></textarea>
           <span id="wordMeter" class="word-meter">0 / 60 words</span>
         </div>
 
         <div class="control-grid">
           <label class="control-field">
-            <span>VISUAL STYLE</span>
+            <span>LOOK</span>
             <select id="visualStyleSelect" class="visual-style-select" aria-label="Visual style">
               <option value="cursed-real" selected>CURSED REAL</option>
               <option value="photoreal">PHOTOREAL</option>
@@ -60,11 +54,11 @@
             </select>
           </label>
           <label class="control-field">
-            <span>ENERGY</span>
+            <span>CHAOS</span>
             <select id="chaosSelect" class="chaos-select" aria-label="Chaos level">
-              <option value="chill">CHAOS: 6/10</option>
-              <option value="cooked" selected>CHAOS: 10/10</option>
-              <option value="nuclear">CHAOS: 14/10</option>
+              <option value="chill">6/10</option>
+              <option value="cooked" selected>10/10</option>
+              <option value="nuclear">14/10</option>
             </select>
           </label>
         </div>
@@ -74,16 +68,10 @@
           <button id="quickBtn" class="btn btn-rot" type="button">🎲 QUICK ROT</button>
         </div>
 
-        <div class="visual-note">
-          <strong>FREE MULTI-SHOT FORMAT</strong>
-          <span>8 AI keyframes become 32 linked motion shots in every visual style. Gemini automatically casts a narrator plus a recurring character voice when the story contains dialogue.</span>
-        </div>
-
-        <div class="mini-facts">
-          <div class="mini-fact"><b id="sceneCount">32</b><span>linked shots</span></div>
-          <div class="mini-fact"><b id="scriptWords">~125</b><span>words</span></div>
-          <div class="mini-fact"><b id="videoLength">60s</b><span>runtime</span></div>
-          <div class="mini-fact"><b>2</b><span>auto-cast voices</span></div>
+        <div class="creator-hidden-metrics" aria-hidden="true">
+          <span id="sceneCount">32</span>
+          <span id="scriptWords">~125</span>
+          <span id="videoLength">60s</span>
         </div>
       </section>
     </section>
