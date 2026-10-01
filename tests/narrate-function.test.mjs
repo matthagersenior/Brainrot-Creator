@@ -59,6 +59,9 @@ test('narration uses Gemini 3.1 Flash TTS and directs the narrator from story st
     assert.match(prompt, /deadpan/i);
     assert.match(prompt, /triumphant/i);
     assert.match(prompt, /exact script/i);
+    assert.match(prompt, /52 to 56 seconds/i);
+    assert.match(prompt, /human rhythm/i);
+    assert.match(prompt, /do not rush/i);
 
     const voiceName = requestedBody.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName;
     assert.equal(voiceName, 'Gacrux');
