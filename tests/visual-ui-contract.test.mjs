@@ -51,7 +51,8 @@ test('creator uses separate create, cooking, and result screens with final-playe
   assert.match(html, /id="createView"/);
   assert.match(html, /id="cookingView"/);
   assert.match(html, /id="resultView"/);
-  assert.match(html, /id="loadingGallery"/);
+  assert.match(html, /id="chaosCanvas"/);
+  assert.match(html, /id="chaosProgressRing"/);
   assert.match(html, /id="playPauseBtn"/);
   assert.match(html, /id="repeatBtn"/);
   assert.match(html, /id="nextTrendBtn"/);
@@ -62,7 +63,8 @@ test('creator uses separate create, cooking, and result screens with final-playe
   assert.match(app, /pausePlayback/);
   assert.match(app, /resumePlayback/);
   assert.match(app, /generateNextTrend/);
-  assert.match(app, /loadingGallery/);
+  assert.match(app, /handleChaosTap/);
+  assert.match(app, /finishCookingChaos/);
 
   assert.match(css, /\.app-view\[hidden\]/);
   assert.match(css, /100svh/);
@@ -70,16 +72,25 @@ test('creator uses separate create, cooking, and result screens with final-playe
 });
 
 
-test('cooking screen uses story-blind chaos instead of revealing generated keyframes', async () => {
+test('cooking screen is an interactive story-blind mini-game instead of generation status cards', async () => {
   const app = await readFile(new URL('app.mjs', root), 'utf8');
   const html = await readFile(new URL('index.html', root), 'utf8');
+  const css = await readFile(new URL('styles.css', root), 'utf8');
 
-  assert.match(app, /COOKING_CHAOS_LABELS/);
+  assert.match(app, /CHAOS_OBJECTS/);
   assert.match(app, /startCookingChaos/);
   assert.match(app, /stopCookingChaos/);
   assert.match(app, /renderCookingChaos/);
-  assert.doesNotMatch(app, /tile\.style\.backgroundImage\s*=\s*.*image\.src/);
-  assert.match(html, /aria-label="Story-blind Brainrot cooking animation"/);
+  assert.match(app, /handleChaosTap/);
+  assert.match(app, /cookingScore/);
+  assert.match(app, /cookingCombo/);
+  assert.match(app, /finishCookingChaos/);
+  assert.match(html, /id="chaosCanvas"/);
+  assert.match(html, /Tap everything\./);
+  assert.match(html, /KEEP THE COMBO ALIVE/);
+  assert.doesNotMatch(html, /keyframes processed|Building your one-minute disaster/i);
+  assert.match(css, /\.chaos-game-shell/);
+  assert.match(css, /touch-action:\s*none/);
 });
 
 
