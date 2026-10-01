@@ -151,8 +151,9 @@ Return JSON only with exactly the schema requested by the API.
 
 Rules:
 - Exactly 8 scenes.
-- Total spoken narration: 140 to 160 words.
-- Each scene should be roughly 16 to 22 spoken words and flow into the next as one story.
+- Total spoken narration: 118 to 132 words. Natural delivery matters more than filling every second.
+- Each scene should be roughly 13 to 18 spoken words and flow into the next as one story.
+- Write for spoken rhythm: vary sentence length, use clean punctuation, and leave room for micro-pauses between beats instead of cramming clauses together.
 - Hook immediately in scene 1, escalate through scenes 2-6, callback in scene 7, punchline/final verdict in scene 8.
 - Every scene must depict the literal story beat being narrated. Do not generate unrelated generic meme imagery.
 - Keep the same recurring subject, appearance, world, and recurring props visually consistent across all 8 scenes.
