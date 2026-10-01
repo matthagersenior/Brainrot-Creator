@@ -32,12 +32,17 @@ test('client drives playback through linked micro-shots while reusing the eight 
 });
 
 
-test('creator labels the free multi-shot format and carries prior-beat continuity into later keyframe prompts', async () => {
+test('creator keeps the multi-shot engine but strips explanatory copy from the visible prompt screen', async () => {
   const html = await readFile(new URL('index.html', root), 'utf8');
   const app = await readFile(new URL('app.mjs', root), 'utf8');
+  const css = await readFile(new URL('styles.css', root), 'utf8');
 
-  assert.match(html, /id="sceneCount">32<\/b><span>linked shots<\/span>/);
-  assert.match(html, /8 AI keyframes[^<]*32 linked/);
+  assert.match(html, /id="sceneCount">32<\/span>/);
+  assert.match(html, /id="promptInput"[^>]*rows="8"/);
+  assert.match(html, /placeholder="What should happen\?"/);
+  assert.doesNotMatch(html, /FREE MULTI-SHOT FORMAT|A richer prompt in|Describe the idea, characters, setting/i);
+  assert.match(css, /\.creator-hidden-metrics/);
+  assert.match(css, /min-height:\s*clamp\(190px,\s*30svh,\s*310px\)/);
   assert.match(app, /Continue the immediately previous story beat/);
   assert.match(app, /sceneCountEl\.textContent = state\.microTimeline\.length/);
 });
