@@ -370,7 +370,7 @@ export function captionWindow(words = [], activeIndex = 0, windowSize = 6) {
 
   for (let index = 0; index < words.length; index += 1) {
     const count = index - start + 1;
-    const punctuationBreak = count >= 3 && /[.!?,;:]["')\\]]?$/.test(String(words[index]));
+    const punctuationBreak = count >= 3 && /[.!?,;:](?:["')\]]*)$/.test(String(words[index]));
     const sizeBreak = count >= safeWindow;
     const finalWord = index === words.length - 1;
     if (!punctuationBreak && !sizeBreak && !finalWord) continue;
@@ -394,10 +394,10 @@ export function pacedWordIndex(words = [], progress = 0) {
   const clamped = Math.max(0, Math.min(1, Number(progress) || 0));
   const weights = words.map(word => {
     const text = String(word || '');
-    const letters = text.replace(/[^\\p{L}\\p{N}]/gu, '').length;
+    const letters = text.replace(/[^\p{L}\p{N}]/gu, '').length;
     let weight = 0.88 + Math.min(0.52, letters / 18);
-    if (/[.!?]["')\\]]?$/.test(text)) weight += 1.35;
-    else if (/[,;:]["')\\]]?$/.test(text)) weight += 0.62;
+    if (/[.!?](?:["')\]]*)$/.test(text)) weight += 1.35;
+    else if (/[,;:](?:["')\]]*)$/.test(text)) weight += 0.62;
     return weight;
   });
   const total = weights.reduce((sum, weight) => sum + weight, 0);
