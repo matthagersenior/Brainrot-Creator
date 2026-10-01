@@ -10,6 +10,7 @@ import {
   isSafeTrend,
   trendToPrompt,
   captionWindow,
+  pacedWordIndex,
   storyWordCount,
   normalizeVisualStyle,
   getVisualStylePreset,
@@ -118,6 +119,8 @@ const state = {
   raf: 0,
   stopTimer: 0,
   speechWordIndex: null,
+  narrationPlaybackRate: 1,
+  narrationPlaybackSeconds: TARGET_SECONDS,
   generateToken: 0,
   cookingChaosTimer: 0,
   cookingChaosTick: 0,
@@ -781,6 +784,25 @@ async function requestNarrationWithFallback(text) {
   }
 }
 
+function naturalNarrationTiming(buffer) {
+  const duration = Math.max(1, Number(buffer?.duration) || TARGET_SECONDS);
+  let rate = Math.max(0.94, Math.min(1.08, duration / 54.5));
+  if (duration / rate > 58.5) rate = duration / 58.5;
+  return {
+    rate,
+    seconds: Math.min(TARGET_SECONDS, duration / rate),
+  };
+}
+
+function applyNarrationTiming(buffer) {
+  const timing = naturalNarrationTiming(buffer);
+  state.narrationPlaybackRate = timing.rate;
+  state.narrationPlaybackSeconds = timing.seconds;
+  if (!state.story) return;
+  state.timeline = buildSceneTimeline(state.story.scenes, timing.seconds);
+  state.microTimeline = buildMicroShotTimeline(state.timeline, state.visualStyle);
+}
+
 function canRecordNarratedVideo() {
   return Boolean(state.audioBuffer && canvas.captureStream && window.MediaRecorder && (window.AudioContext || window.webkitAudioContext));
 }
@@ -817,6 +839,8 @@ async function generate(promptValue) {
   startCookingChaos();
   setGenerating(true);
   state.audioBuffer = null;
+  state.narrationPlaybackRate = 1;
+  state.narrationPlaybackSeconds = TARGET_SECONDS;
   state.story = null;
   state.timeline = [];
   state.microTimeline = [];
@@ -859,6 +883,7 @@ async function generate(promptValue) {
   const narrationPromise = requestNarrationWithFallback(narrationText()).then(narration => {
     if (token !== state.generateToken) return;
     state.audioBuffer = narration.buffer;
+    applyNarrationTiming(narration.buffer);
     state.voiceSource = narration.voiceMode === 'dual'
       ? `${narration.source} · story-matched · 2 voices`
       : `${narration.source} · story-matched`;
@@ -866,6 +891,8 @@ async function generate(promptValue) {
   }).catch(() => {
     if (token !== state.generateToken) return;
     state.audioBuffer = null;
+    state.narrationPlaybackRate = 1;
+    state.narrationPlaybackSeconds = TARGET_SECONDS;
     state.voiceSource = 'device speechSynthesis';
     setSources();
   });
@@ -953,13 +980,14 @@ function startDeviceSpeech() {
   const text = narrationText();
   const utterance = new SpeechSynthesisUtterance(text);
   const deviceProfile = {
-    'cursed-real': { rate: 0.96, pitch: 0.92 },
+    'cursed-real': { rate: 0.97, pitch: 0.92 },
     photoreal: { rate: 1.0, pitch: 1.0 },
-    cinematic: { rate: 0.92, pitch: 0.9 },
-    cartoon: { rate: 1.1, pitch: 1.12 },
+    cinematic: { rate: 0.95, pitch: 0.9 },
+    cartoon: { rate: 1.04, pitch: 1.08 },
   }[state.visualStyle] || { rate: 1, pitch: 1 };
-  const pacingRate = Math.max(0.72, Math.min(1.35, countWords(text) / 170));
-  utterance.rate = Math.max(0.72, Math.min(1.35, pacingRate * deviceProfile.rate));
+  const wordCount = countWords(text);
+  const pacingRate = wordCount > 145 ? 1.03 : wordCount < 110 ? 0.96 : 1;
+  utterance.rate = Math.max(0.88, Math.min(1.1, pacingRate * deviceProfile.rate));
   utterance.pitch = deviceProfile.pitch;
   utterance.volume = 1;
   utterance.addEventListener('boundary', event => {
@@ -993,7 +1021,7 @@ async function play({ record = false } = {}) {
     await audioContext.resume();
     const source = audioContext.createBufferSource();
     source.buffer = state.audioBuffer;
-    source.playbackRate.value = Math.max(0.01, state.audioBuffer.duration / TARGET_SECONDS);
+    source.playbackRate.value = Math.max(0.01, state.narrationPlaybackRate || 1);
     source.connect(audioContext.destination);
     if (record) {
       state.mediaDestination = audioContext.createMediaStreamDestination();
@@ -1001,7 +1029,9 @@ async function play({ record = false } = {}) {
       beginRecorder(state.mediaDestination);
     }
     state.audioSource = source;
-    source.addEventListener('ended', finishPlayback, { once: true });
+    source.addEventListener('ended', () => {
+      if (state.audioSource === source) state.audioSource = null;
+    }, { once: true });
     source.start(0);
   } else {
     startDeviceSpeech();
@@ -1125,7 +1155,8 @@ function sceneStateAtTime(seconds) {
   const microState = microShotStateAtTime(seconds);
   const scene = timeline[sceneIndex];
   const words = scene.text.trim().split(/\s+/);
-  let localWordIndex = Math.min(words.length - 1, Math.floor(((seconds - scene.start) / Math.max(scene.duration, .001)) * words.length));
+  const sceneProgress = (seconds - scene.start) / Math.max(scene.duration, .001);
+  let localWordIndex = pacedWordIndex(words, sceneProgress);
   if (!state.audioBuffer && Number.isInteger(state.speechWordIndex)) {
     const map = globalWordMap();
     const mapped = map[Math.min(map.length - 1, Math.max(0, state.speechWordIndex))];
@@ -1194,9 +1225,60 @@ function drawImageCover(image, motion, progress) {
   ctx.restore();
 }
 
+function drawSceneTransition(previousImage, previousMotion, image, motion, progress, sceneIndex) {
+  const t = easeMotion(Math.max(0, Math.min(1, progress)));
+  const mode = sceneIndex % 3;
+
+  if (mode === 1) {
+    if (t < 0.5) {
+      ctx.save();
+      drawImageCover(previousImage, previousMotion, 1);
+      ctx.fillStyle = `rgba(0,0,0,${t * 2})`;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
+    } else {
+      ctx.save();
+      ctx.fillStyle = '#05070a';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.globalAlpha = (t - 0.5) * 2;
+      drawImageCover(image, motion, t);
+      ctx.restore();
+    }
+    return;
+  }
+
+  if (mode === 2) {
+    ctx.save();
+    ctx.globalAlpha = 1 - t;
+    ctx.translate(-56 * t, 0);
+    drawImageCover(previousImage, previousMotion, 1);
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = t;
+    ctx.translate(56 * (1 - t), 0);
+    drawImageCover(image, motion, t);
+    ctx.restore();
+    return;
+  }
+
+  ctx.save();
+  ctx.globalAlpha = 1 - t;
+  ctx.filter = `blur(${(t * 4).toFixed(2)}px)`;
+  drawImageCover(previousImage, previousMotion, 1);
+  ctx.restore();
+
+  ctx.save();
+  ctx.globalAlpha = t;
+  ctx.filter = `blur(${((1 - t) * 4).toFixed(2)}px)`;
+  drawImageCover(image, motion, t);
+  ctx.restore();
+}
+
 function drawLinkedVisual(scene, sceneIndex, microShot, microProgress, sceneProgress) {
   const sourceImageIndex = microShot?.sourceImageIndex ?? sceneIndex;
-  const image = state.sceneImages[sourceImageIndex];
+  const nearest = nearestImageIndex(state.sceneImages, sourceImageIndex);
+  const image = state.sceneImages[sourceImageIndex] || (nearest >= 0 ? state.sceneImages[nearest] : null);
   if (!image || !microShot?.motion) {
     drawCinematicFallback(scene, sceneIndex, microShot ? microProgress : sceneProgress);
     return;
@@ -1206,21 +1288,20 @@ function drawLinkedVisual(scene, sceneIndex, microShot, microProgress, sceneProg
   const previousImage = Number.isInteger(transitionFromSceneIndex)
     ? state.sceneImages[transitionFromSceneIndex]
     : null;
-  const crossfadeWindow = 0.22;
+  const transitionWindow = 0.42;
 
-  if (previousImage && microProgress < crossfadeWindow) {
+  if (previousImage && microProgress < transitionWindow) {
     const previousShot = state.microTimeline
       .filter(item => item.sceneIndex === transitionFromSceneIndex)
       .slice(-1)[0];
-    ctx.save();
-    ctx.globalAlpha = 1;
-    drawImageCover(previousImage, previousShot?.motion || microShot.motion, 1);
-    ctx.restore();
-
-    ctx.save();
-    ctx.globalAlpha = easeMotion(microProgress / crossfadeWindow);
-    drawImageCover(image, microShot.motion, microProgress);
-    ctx.restore();
+    drawSceneTransition(
+      previousImage,
+      previousShot?.motion || microShot.motion,
+      image,
+      microShot.motion,
+      microProgress / transitionWindow,
+      sceneIndex,
+    );
     return;
   }
 
@@ -1229,42 +1310,47 @@ function drawLinkedVisual(scene, sceneIndex, microShot, microProgress, sceneProg
 
 function drawCinematicFallback(scene, sceneIndex, progress) {
   const [r, g, b] = hexToRgb(scene.color);
+  const mutedR = Math.round(34 + r * 0.18);
+  const mutedG = Math.round(38 + g * 0.18);
+  const mutedB = Math.round(44 + b * 0.18);
   const gradient = ctx.createLinearGradient(0, 0, 720, 1280);
-  gradient.addColorStop(0, `rgb(${Math.max(8, r - 55)}, ${Math.max(8, g - 55)}, ${Math.max(8, b - 55)})`);
-  gradient.addColorStop(.48, `rgb(${Math.max(5, r - 95)}, ${Math.max(5, g - 95)}, ${Math.max(5, b - 95)})`);
+  gradient.addColorStop(0, '#171b20');
+  gradient.addColorStop(.52, `rgb(${mutedR}, ${mutedG}, ${mutedB})`);
   gradient.addColorStop(1, '#05070a');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, 720, 1280);
 
-  const horizon = 460 + Math.sin(sceneIndex * .8) * 55;
-  ctx.globalAlpha = .34;
-  ctx.fillStyle = `rgba(${r},${g},${b},.45)`;
-  for (let i = 0; i < 7; i += 1) {
-    const width = 90 + ((sceneIndex * 31 + i * 47) % 180);
-    const height = 170 + ((sceneIndex * 63 + i * 29) % 330);
-    ctx.fillRect(i * 118 - 45 + progress * 8, horizon - height, width, height);
+  const lightX = 180 + ((sceneIndex * 83) % 360);
+  const lightY = 300 + Math.sin(sceneIndex * 0.9) * 90;
+  const light = ctx.createRadialGradient(lightX, lightY, 20, lightX, lightY, 430);
+  light.addColorStop(0, 'rgba(255,255,255,.15)');
+  light.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = light;
+  ctx.fillRect(0, 0, 720, 960);
+
+  const horizon = 650 + Math.sin(sceneIndex * .8) * 45;
+  ctx.fillStyle = 'rgba(0,0,0,.38)';
+  for (let i = 0; i < 8; i += 1) {
+    const width = 72 + ((sceneIndex * 29 + i * 41) % 150);
+    const height = 120 + ((sceneIndex * 51 + i * 31) % 280);
+    ctx.fillRect(i * 104 - 36 + progress * 10, horizon - height, width, height);
+  }
+
+  const drift = Math.sin(progress * Math.PI) * 12;
+  ctx.fillStyle = 'rgba(4,6,8,.72)';
+  ctx.beginPath();
+  ctx.ellipse(360 + drift, 500, 88, 108, 0, 0, Math.PI * 2);
+  ctx.fill();
+  roundedRect(270 + drift, 585, 180, 330, 80);
+  ctx.fill();
+
+  ctx.globalAlpha = .12;
+  ctx.fillStyle = '#ffffff';
+  for (let i = 0; i < 14; i += 1) {
+    const y = 80 + i * 83 + ((sceneIndex * 17) % 31);
+    ctx.fillRect(0, y, 720, 1);
   }
   ctx.globalAlpha = 1;
-
-  ctx.fillStyle = 'rgba(3,5,7,.78)';
-  roundedRect(52, 185, 616, 530, 30);
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,.14)';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  ctx.fillStyle = 'rgba(255,255,255,.55)';
-  ctx.font = '800 19px ui-sans-serif, system-ui, sans-serif';
-  ctx.textAlign = 'left';
-  ctx.fillText('STORY SHOT', 82, 230);
-  drawWrappedText(scene.setting, 82, 285, 556, 42, 31, '#ffffff', 800);
-  ctx.fillStyle = 'rgba(255,255,255,.48)';
-  ctx.font = '700 17px ui-sans-serif, system-ui, sans-serif';
-  ctx.fillText('ACTION', 82, 475);
-  drawWrappedText(scene.action, 82, 520, 556, 34, 22, 'rgba(255,255,255,.86)', 700);
-  ctx.fillStyle = 'rgba(255,255,255,.45)';
-  ctx.font = '650 16px ui-sans-serif, system-ui, sans-serif';
-  ctx.fillText(scene.camera, 82, 675);
 }
 
 function drawWrappedText(text, x, y, maxWidth, lineHeight, size, fill, weight = 800) {
@@ -1291,7 +1377,7 @@ function drawWrappedText(text, x, y, maxWidth, lineHeight, size, fill, weight = 
 }
 
 function drawCaption(words, activeIndex) {
-  const { words: visibleWords, localActiveIndex } = captionWindow(words, activeIndex, 8);
+  const { words: visibleWords, localActiveIndex } = captionWindow(words, activeIndex, 6);
   ctx.save();
   const fontSize = 55;
   ctx.font = `900 ${fontSize}px Impact, Arial Black, sans-serif`;
@@ -1378,7 +1464,8 @@ function drawFrame(seconds) {
   ctx.font = '750 18px ui-sans-serif, system-ui, sans-serif';
   ctx.fillText(`${String(Math.floor(seconds)).padStart(2, '0')}s / 60s`, 666, 74);
 
-  drawCaption(words, localWordIndex);
+  const captionStillSpeaking = !state.audioBuffer || seconds <= state.narrationPlaybackSeconds + 0.35;
+  if (captionStillSpeaking) drawCaption(words, localWordIndex);
   ctx.restore();
 
   const totalProgress = Math.max(0, Math.min(1, seconds / TARGET_SECONDS));
