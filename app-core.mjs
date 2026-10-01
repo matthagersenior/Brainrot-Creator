@@ -171,7 +171,7 @@ export function buildFallbackStory(promptValue, visualStyleValue = 'cursed-real'
   const continuity = fallbackContinuity(noun);
   const rows = [
     {
-      text: `Emergency broadcast: ${noun} just arrived at the DMV with negative aura, and every person in line quietly notices something is wrong.`,
+      text: `Emergency broadcast: ${noun} reaches the DMV, and the whole waiting room quietly notices something is off.`,
       setting: 'a fluorescent-lit American DMV waiting room with plastic chairs and a numbered-ticket display',
       action: `${noun} enters the DMV while ordinary people turn and stare`,
       camera: 'handheld eye-level medium-wide shot with a slow push in',
@@ -179,7 +179,7 @@ export function buildFallbackStory(promptValue, visualStyleValue = 'cursed-real'
       burst: 'AURA DETECTED',
     },
     {
-      text: `A suspicious frog at the counter checks the clipboard and says, "Aura audit started," while the clerk keeps working like this is completely normal.`,
+      text: `A suspicious frog checks the clipboard and says, "Aura audit started," while the clerk keeps stamping forms.`,
       setting: 'the same DMV service counter and waiting area',
       action: 'a realistic frog-like clerk marks aura scores on a clipboard while customers wait',
       camera: 'documentary over-the-shoulder shot, shallow depth of field',
@@ -187,7 +187,7 @@ export function buildFallbackStory(promptValue, visualStyleValue = 'cursed-real'
       burst: 'AURA AUDIT',
     },
     {
-      text: `Then the WiFi gains consciousness, the ticket monitor flashes nonsense, and every phone in the room reconnects to the same cursed network.`,
+      text: `Then the WiFi wakes up, every phone reconnects, and the ticket monitor starts calling impossible numbers.`,
       setting: 'the same DMV, now focused on ceiling access points, ticket monitor, and customers holding phones',
       action: 'phones simultaneously reconnect while the ticket display glitches in a physically believable room',
       camera: 'slow rack focus from a phone screen to the ticket monitor',
@@ -195,7 +195,7 @@ export function buildFallbackStory(promptValue, visualStyleValue = 'cursed-real'
       burst: 'WIFI AWAKENS',
     },
     {
-      text: `Nobody leaves because a tiny shark in sunglasses rolls in with an official-looking cart and starts inspecting licenses with terrifying confidence.`,
+      text: `A tiny shark in sunglasses rolls in, inspecting licenses like the most confident supervisor alive.`,
       setting: 'the same DMV aisle between rows of plastic chairs',
       action: 'a small realistic shark-like creature in sunglasses pushes an office cart and inspects licenses',
       camera: 'low tracking shot following the cart through the waiting room',
@@ -203,7 +203,7 @@ export function buildFallbackStory(promptValue, visualStyleValue = 'cursed-real'
       burst: 'OFFICIAL BUSINESS',
     },
     {
-      text: `At this point ${noun} unlocks forbidden rizz, stands under the worst fluorescent light imaginable, and somehow becomes the room's main character.`,
+      text: `${noun} steps under the fluorescent lights, finds forbidden confidence, and somehow becomes the room's main character.`,
       setting: 'the same DMV under harsh overhead fluorescent fixtures',
       action: `${noun} stands confidently while the entire room subtly reorients attention toward them`,
       camera: 'slow cinematic push-in with restrained lens flare and shallow depth of field',
@@ -211,7 +211,7 @@ export function buildFallbackStory(promptValue, visualStyleValue = 'cursed-real'
       burst: 'RIZZ UNLOCKED',
     },
     {
-      text: `The frog whispers, "Plot twist," the floor display turns into a loading bar, and the line advances exactly one impossible inch.`,
+      text: `The frog whispers, "Plot twist," and the entire line advances exactly one ridiculous inch.`,
       setting: 'the same DMV floor and queue ropes, with ordinary customers still present',
       action: 'a realistic illuminated loading-bar pattern appears across the floor while the queue inches forward',
       camera: 'top-down tilt into a wide reaction shot',
@@ -219,7 +219,7 @@ export function buildFallbackStory(promptValue, visualStyleValue = 'cursed-real'
       burst: 'PLOT TWIST',
     },
     {
-      text: `The frog returns with printed receipts, says, "Side quest complete," and every exhausted customer immediately accepts this explanation.`,
+      text: `The frog prints a receipt, says, "Side quest complete," and every exhausted customer accepts it.`,
       setting: 'the same DMV counter with receipt printer, paperwork, and tired customers',
       action: 'frog clerk holds long printed receipts while customers study them with resigned expressions',
       camera: 'close-up on receipts, then gentle handheld pullback to the group',
@@ -227,7 +227,7 @@ export function buildFallbackStory(promptValue, visualStyleValue = 'cursed-real'
       burst: 'SIDE QUEST',
     },
     {
-      text: `Final verdict: ${noun} survives, gains impossible lore, and walks out as the DMV doors close behind one completely defeated employee.`,
+      text: `Final verdict: ${noun} walks out victorious while the DMV doors close behind one completely defeated employee.`,
       setting: 'the DMV entrance at dusk, same visual world and recurring characters',
       action: `${noun} exits through automatic doors while the clerk watches from inside`,
       camera: 'cinematic rear three-quarter tracking shot ending on the closing doors',
@@ -362,10 +362,50 @@ export function trendToPrompt(value = '') {
   return words.join(' ');
 }
 
-export function captionWindow(words = [], activeIndex = 0, windowSize = 7) {
+export function captionWindow(words = [], activeIndex = 0, windowSize = 6) {
   if (!words.length) return { words: [], localActiveIndex: 0 };
-  const half = Math.floor(windowSize / 2);
-  const start = Math.max(0, Math.min(words.length - windowSize, activeIndex - half));
-  const slice = words.slice(start, start + windowSize);
-  return { words: slice, localActiveIndex: activeIndex - start };
+  const safeActive = Math.max(0, Math.min(words.length - 1, activeIndex));
+  const safeWindow = Math.max(3, windowSize);
+  let start = 0;
+
+  for (let index = 0; index < words.length; index += 1) {
+    const count = index - start + 1;
+    const punctuationBreak = count >= 3 && /[.!?,;:]["')\\]]?$/.test(String(words[index]));
+    const sizeBreak = count >= safeWindow;
+    const finalWord = index === words.length - 1;
+    if (!punctuationBreak && !sizeBreak && !finalWord) continue;
+
+    if (safeActive <= index) {
+      const slice = words.slice(start, index + 1);
+      return { words: slice, localActiveIndex: safeActive - start };
+    }
+    start = index + 1;
+  }
+
+  const fallbackStart = Math.max(0, words.length - safeWindow);
+  return {
+    words: words.slice(fallbackStart),
+    localActiveIndex: safeActive - fallbackStart,
+  };
+}
+
+export function pacedWordIndex(words = [], progress = 0) {
+  if (!words.length) return 0;
+  const clamped = Math.max(0, Math.min(1, Number(progress) || 0));
+  const weights = words.map(word => {
+    const text = String(word || '');
+    const letters = text.replace(/[^\\p{L}\\p{N}]/gu, '').length;
+    let weight = 0.88 + Math.min(0.52, letters / 18);
+    if (/[.!?]["')\\]]?$/.test(text)) weight += 1.35;
+    else if (/[,;:]["')\\]]?$/.test(text)) weight += 0.62;
+    return weight;
+  });
+  const total = weights.reduce((sum, weight) => sum + weight, 0);
+  const target = clamped * total;
+  let cursor = 0;
+  for (let index = 0; index < weights.length; index += 1) {
+    cursor += weights[index];
+    if (target <= cursor) return index;
+  }
+  return words.length - 1;
 }
