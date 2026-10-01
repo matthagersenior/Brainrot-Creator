@@ -128,3 +128,21 @@ test('linked micro-shots preserve beat-to-beat continuity and style-specific mot
   assert.notDeepEqual(realistic[0].motion, cartoon[0].motion);
   assert.ok(cartoon.some(shot => Math.abs(shot.motion.rotationEnd) > Math.abs(realistic[0].motion.rotationEnd)));
 });
+
+
+test('captions stay on phrase-sized chunks instead of sliding every spoken word', () => {
+  const words = ['DMV', 'doors', 'close', 'behind', 'one', 'employee.', 'Then', 'silence.'];
+  const early = core.captionWindow(words, 1, 6);
+  const late = core.captionWindow(words, 4, 6);
+  const next = core.captionWindow(words, 6, 6);
+
+  assert.deepEqual(early.words, ['DMV', 'doors', 'close', 'behind', 'one', 'employee.']);
+  assert.deepEqual(late.words, early.words);
+  assert.deepEqual(next.words, ['Then', 'silence.']);
+});
+
+test('punctuation-aware subtitle timing leaves a readable beat at sentence endings', () => {
+  const words = ['go.', 'next'];
+  assert.equal(core.pacedWordIndex(words, 0.55), 0);
+  assert.equal(core.pacedWordIndex(words, 0.99), 1);
+});
