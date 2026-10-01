@@ -31,20 +31,22 @@ const PUTER_TTS_FALLBACKS = Object.freeze([
   Object.freeze({ options: { voice: 'Joanna', engine: 'neural' }, label: 'Puter · neural voice' }),
 ]);
 
-const COOKING_CHAOS_LABELS = [
-  'AURA OVERCLOCKED', 'LORE BUFFERING', 'RIZZ COMPILING', 'MEME PARTICLES',
-  'REALITY LAGGING', 'BRAINcells OFFLINE', 'PIXELS FERMENTING', 'CHAOS VERIFIED',
-  'ROT ENGINE HOT', 'NPC SIGNAL LOST', 'SIDE QUEST LOADING', 'VIBES UNSTABLE',
-];
+const CHAOS_OBJECTS = Object.freeze([
+  Object.freeze({ glyph: '🐸', points: 15, scale: 1.05 }),
+  Object.freeze({ glyph: '🍌', points: 10, scale: 1.0 }),
+  Object.freeze({ glyph: '🐟', points: 20, scale: 1.05 }),
+  Object.freeze({ glyph: '🧻', points: 12, scale: 1.0 }),
+  Object.freeze({ glyph: '🛒', points: 18, scale: 1.0 }),
+  Object.freeze({ glyph: '👁️', points: 22, scale: .95 }),
+  Object.freeze({ glyph: '📎', points: 14, scale: 1.0 }),
+  Object.freeze({ glyph: '⚠️', points: 16, scale: .95 }),
+  Object.freeze({ glyph: '🧃', points: 13, scale: 1.0 }),
+  Object.freeze({ glyph: '🦆', points: 21, scale: 1.0 }),
+  Object.freeze({ glyph: '🧦', points: 11, scale: 1.0 }),
+  Object.freeze({ glyph: '🌀', points: 25, scale: .95 }),
+]);
 
-const COOKING_CHAOS_BACKGROUNDS = [
-  'radial-gradient(circle at 20% 25%, rgba(255,46,196,.95), transparent 24%), linear-gradient(145deg, #130520 0%, #30104a 48%, #001f29 100%)',
-  'radial-gradient(circle at 76% 18%, rgba(198,255,0,.9), transparent 18%), linear-gradient(160deg, #071a20 0%, #112933 48%, #4a0f38 100%)',
-  'conic-gradient(from 25deg at 50% 50%, #ff2ec4, #24132d, #00e5ff, #090011, #c6ff00, #ff2ec4)',
-  'linear-gradient(25deg, transparent 0 18%, rgba(0,229,255,.8) 19% 24%, transparent 25% 43%, rgba(255,46,196,.9) 44% 52%, transparent 53%), #130520',
-  'radial-gradient(ellipse at 70% 70%, rgba(140,82,255,.9), transparent 28%), radial-gradient(circle at 28% 34%, rgba(255,91,33,.75), transparent 20%), #071018',
-  'repeating-linear-gradient(115deg, #0d0317 0 18px, #ff2ec4 19px 24px, #071018 25px 42px, #00e5ff 43px 47px)',
-];
+const CHAOS_COLORS = Object.freeze(['#ff2ec4', '#00e5ff', '#c6ff00', '#8c52ff', '#ffb020', '#ff5b21']);
 
 const canvas = document.getElementById('videoCanvas');
 const ctx = canvas.getContext('2d');
@@ -69,8 +71,14 @@ const resultVoiceSourceEl = document.getElementById('resultVoiceSource');
 const createView = document.getElementById('createView');
 const cookingView = document.getElementById('cookingView');
 const resultView = document.getElementById('resultView');
-const loadingGallery = document.getElementById('loadingGallery');
 const loadingProgress = document.getElementById('loadingProgress');
+const chaosCanvas = document.getElementById('chaosCanvas');
+const chaosCtx = chaosCanvas?.getContext('2d');
+const chaosScoreEl = document.getElementById('chaosScore');
+const chaosComboEl = document.getElementById('chaosCombo');
+const chaosProgressRing = document.getElementById('chaosProgressRing');
+const chaosProgressText = document.getElementById('chaosProgressText');
+const chaosReady = document.getElementById('chaosReady');
 const resultTitle = document.getElementById('resultTitle');
 const resultStyle = document.getElementById('resultStyle');
 const playPauseBtn = document.getElementById('playPauseBtn');
@@ -122,8 +130,18 @@ const state = {
   narrationPlaybackRate: 1,
   narrationPlaybackSeconds: TARGET_SECONDS,
   generateToken: 0,
-  cookingChaosTimer: 0,
-  cookingChaosTick: 0,
+  cookingRaf: 0,
+  cookingLastFrameAt: 0,
+  cookingStartedAt: 0,
+  cookingNextSpawnAt: 0,
+  cookingObjects: [],
+  cookingParticles: [],
+  cookingScore: 0,
+  cookingCombo: 1,
+  cookingLastHitAt: 0,
+  cookingProgressTarget: 0,
+  cookingProgressDisplay: 0,
+  cookingReady: false,
 };
 
 function isStandaloneApp() {
@@ -198,49 +216,266 @@ function setView(view) {
   window.scrollTo({ top: 0, behavior: 'auto' });
 }
 
-function resetLoadingGallery() {
-  [...loadingGallery.children].forEach((tile, index) => {
-    tile.classList.remove('loaded', 'chaos-pop');
-    tile.style.backgroundImage = '';
-    tile.style.transform = '';
-    const label = tile.querySelector('span');
-    if (label) label.textContent = COOKING_CHAOS_LABELS[index % COOKING_CHAOS_LABELS.length];
-  });
-  loadingProgress.textContent = 'Cooking 32 linked shots behind a spoiler shield.';
+function randomRange(min, max) {
+  return min + Math.random() * (max - min);
 }
 
-function renderCookingChaos() {
-  state.cookingChaosTick += 1;
-  [...loadingGallery.children].forEach((tile, index) => {
-    const phase = state.cookingChaosTick + index * 3;
-    const background = COOKING_CHAOS_BACKGROUNDS[phase % COOKING_CHAOS_BACKGROUNDS.length];
-    const label = COOKING_CHAOS_LABELS[(phase * 5 + index) % COOKING_CHAOS_LABELS.length];
-    const rotation = ((phase % 7) - 3) * 0.8;
-    const scale = 0.97 + ((phase + index) % 5) * 0.012;
+function updateChaosHud() {
+  if (chaosScoreEl) chaosScoreEl.textContent = String(state.cookingScore);
+  if (chaosComboEl) chaosComboEl.textContent = `×${state.cookingCombo}`;
+  const progress = Math.max(0, Math.min(1, state.cookingProgressDisplay));
+  if (chaosProgressText) chaosProgressText.textContent = `${Math.round(progress * 100)}%`;
+  if (chaosProgressRing) {
+    const circumference = 113.1;
+    chaosProgressRing.style.strokeDashoffset = String(circumference * (1 - progress));
+  }
+}
 
-    tile.style.backgroundImage = background;
-    tile.style.transform = `rotate(${rotation}deg) scale(${scale})`;
-    tile.classList.toggle('chaos-pop', phase % 2 === 0);
-    const text = tile.querySelector('span');
-    if (text) text.textContent = label;
+function resetLoadingGallery() {
+  state.cookingObjects = [];
+  state.cookingParticles = [];
+  state.cookingScore = 0;
+  state.cookingCombo = 1;
+  state.cookingLastHitAt = 0;
+  state.cookingProgressTarget = 0.04;
+  state.cookingProgressDisplay = 0;
+  state.cookingReady = false;
+  if (chaosReady) chaosReady.hidden = true;
+  if (loadingProgress) loadingProgress.textContent = 'Preparing your video.';
+  updateChaosHud();
+}
+
+function setCookingProgress(value) {
+  state.cookingProgressTarget = Math.max(state.cookingProgressTarget, Math.min(1, Number(value) || 0));
+}
+
+function spawnChaosObject(now) {
+  if (!chaosCanvas || state.cookingObjects.length >= 15) return;
+  const spec = CHAOS_OBJECTS[Math.floor(Math.random() * CHAOS_OBJECTS.length)];
+  const radius = randomRange(34, 55);
+  const edge = Math.floor(Math.random() * 4);
+  let x = randomRange(radius, chaosCanvas.width - radius);
+  let y = randomRange(radius, chaosCanvas.height - radius);
+  let vx = randomRange(-95, 95);
+  let vy = randomRange(-95, 95);
+
+  if (edge === 0) { y = -radius; vy = randomRange(75, 145); }
+  if (edge === 1) { x = chaosCanvas.width + radius; vx = -randomRange(75, 145); }
+  if (edge === 2) { y = chaosCanvas.height + radius; vy = -randomRange(75, 145); }
+  if (edge === 3) { x = -radius; vx = randomRange(75, 145); }
+
+  state.cookingObjects.push({
+    ...spec,
+    x,
+    y,
+    vx,
+    vy,
+    radius,
+    rotation: randomRange(-Math.PI, Math.PI),
+    spin: randomRange(-1.8, 1.8),
+    wobble: randomRange(0, Math.PI * 2),
+    color: CHAOS_COLORS[Math.floor(Math.random() * CHAOS_COLORS.length)],
   });
+  state.cookingNextSpawnAt = now + randomRange(300, 620);
+}
+
+function burstChaos(object, x = object.x, y = object.y) {
+  for (let i = 0; i < 14; i += 1) {
+    const angle = (Math.PI * 2 * i) / 14 + randomRange(-.18, .18);
+    const speed = randomRange(110, 310);
+    state.cookingParticles.push({
+      x,
+      y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: randomRange(.45, .85),
+      age: 0,
+      size: randomRange(4, 11),
+      color: i % 3 === 0 ? '#ffffff' : object.color,
+    });
+  }
+}
+
+function handleChaosTap(event) {
+  if (!chaosCanvas || state.currentView !== 'cooking' || state.cookingReady) return;
+  const rect = chaosCanvas.getBoundingClientRect();
+  const x = ((event.clientX - rect.left) / Math.max(1, rect.width)) * chaosCanvas.width;
+  const y = ((event.clientY - rect.top) / Math.max(1, rect.height)) * chaosCanvas.height;
+  let hitIndex = -1;
+  let hitDistance = Infinity;
+
+  state.cookingObjects.forEach((object, index) => {
+    const distance = Math.hypot(object.x - x, object.y - y);
+    if (distance <= object.radius * 1.35 && distance < hitDistance) {
+      hitIndex = index;
+      hitDistance = distance;
+    }
+  });
+
+  if (hitIndex < 0) {
+    state.cookingCombo = 1;
+    updateChaosHud();
+    return;
+  }
+
+  const [object] = state.cookingObjects.splice(hitIndex, 1);
+  const now = performance.now();
+  state.cookingCombo = now - state.cookingLastHitAt < 1050
+    ? Math.min(8, state.cookingCombo + 1)
+    : 1;
+  state.cookingLastHitAt = now;
+  state.cookingScore += object.points * state.cookingCombo;
+  burstChaos(object, x, y);
+  if (navigator.vibrate) navigator.vibrate(8);
+  updateChaosHud();
+}
+
+function drawChaosBackground(now) {
+  if (!chaosCtx || !chaosCanvas) return;
+  const t = now / 1000;
+  const gradient = chaosCtx.createLinearGradient(0, 0, chaosCanvas.width, chaosCanvas.height);
+  gradient.addColorStop(0, '#090b12');
+  gradient.addColorStop(.52, '#111224');
+  gradient.addColorStop(1, '#06070b');
+  chaosCtx.fillStyle = gradient;
+  chaosCtx.fillRect(0, 0, chaosCanvas.width, chaosCanvas.height);
+
+  chaosCtx.save();
+  chaosCtx.globalAlpha = .17;
+  chaosCtx.strokeStyle = '#8c52ff';
+  chaosCtx.lineWidth = 2;
+  const grid = 72;
+  const offsetX = (t * 26) % grid;
+  const offsetY = (t * 18) % grid;
+  for (let x = -grid + offsetX; x < chaosCanvas.width + grid; x += grid) {
+    chaosCtx.beginPath();
+    chaosCtx.moveTo(x, 0);
+    chaosCtx.lineTo(x - 130, chaosCanvas.height);
+    chaosCtx.stroke();
+  }
+  for (let y = -grid + offsetY; y < chaosCanvas.height + grid; y += grid) {
+    chaosCtx.beginPath();
+    chaosCtx.moveTo(0, y);
+    chaosCtx.lineTo(chaosCanvas.width, y + 90);
+    chaosCtx.stroke();
+  }
+  chaosCtx.restore();
+
+  const pulseX = chaosCanvas.width * (.5 + Math.sin(t * .61) * .34);
+  const pulseY = chaosCanvas.height * (.45 + Math.cos(t * .47) * .28);
+  const pulse = chaosCtx.createRadialGradient(pulseX, pulseY, 0, pulseX, pulseY, 360);
+  pulse.addColorStop(0, 'rgba(0,229,255,.11)');
+  pulse.addColorStop(.55, 'rgba(255,46,196,.045)');
+  pulse.addColorStop(1, 'rgba(0,0,0,0)');
+  chaosCtx.fillStyle = pulse;
+  chaosCtx.fillRect(0, 0, chaosCanvas.width, chaosCanvas.height);
+}
+
+function drawChaosObject(object, now) {
+  const bob = Math.sin(now / 260 + object.wobble) * 8;
+  chaosCtx.save();
+  chaosCtx.translate(object.x, object.y + bob);
+  chaosCtx.rotate(object.rotation);
+  chaosCtx.shadowBlur = 25;
+  chaosCtx.shadowColor = object.color;
+  chaosCtx.fillStyle = 'rgba(5,8,13,.72)';
+  chaosCtx.beginPath();
+  chaosCtx.arc(0, 0, object.radius * 1.05, 0, Math.PI * 2);
+  chaosCtx.fill();
+  chaosCtx.strokeStyle = object.color;
+  chaosCtx.lineWidth = 4;
+  chaosCtx.stroke();
+  chaosCtx.shadowBlur = 0;
+  chaosCtx.font = `${Math.round(object.radius * 1.18 * object.scale)}px "Apple Color Emoji","Segoe UI Emoji",sans-serif`;
+  chaosCtx.textAlign = 'center';
+  chaosCtx.textBaseline = 'middle';
+  chaosCtx.fillText(object.glyph, 0, 2);
+  chaosCtx.restore();
+}
+
+function renderCookingChaos(now) {
+  if (!chaosCtx || !chaosCanvas || !state.cookingRaf) return;
+  const dt = Math.min(.034, Math.max(.001, (now - state.cookingLastFrameAt) / 1000 || .016));
+  state.cookingLastFrameAt = now;
+  const elapsed = Math.max(0, now - state.cookingStartedAt);
+  const pseudoProgress = Math.min(.9, .04 + elapsed / 52000 * .86);
+  const desired = Math.max(state.cookingProgressTarget, pseudoProgress);
+  state.cookingProgressDisplay += (desired - state.cookingProgressDisplay) * Math.min(1, dt * 2.8);
+
+  if (!state.cookingReady && now >= state.cookingNextSpawnAt) spawnChaosObject(now);
+  if (!state.cookingReady && now - state.cookingLastHitAt > 1250 && state.cookingCombo > 1) {
+    state.cookingCombo = Math.max(1, state.cookingCombo - 1);
+  }
+
+  state.cookingObjects.forEach(object => {
+    object.x += object.vx * dt;
+    object.y += object.vy * dt;
+    object.rotation += object.spin * dt;
+    const pad = object.radius * 1.4;
+    if (object.x < -pad && object.vx < 0) object.x = chaosCanvas.width + pad;
+    if (object.x > chaosCanvas.width + pad && object.vx > 0) object.x = -pad;
+    if (object.y < -pad && object.vy < 0) object.y = chaosCanvas.height + pad;
+    if (object.y > chaosCanvas.height + pad && object.vy > 0) object.y = -pad;
+  });
+
+  state.cookingParticles.forEach(particle => {
+    particle.age += dt;
+    particle.x += particle.vx * dt;
+    particle.y += particle.vy * dt;
+    particle.vy += 260 * dt;
+    particle.vx *= .985;
+  });
+  state.cookingParticles = state.cookingParticles.filter(particle => particle.age < particle.life);
+
+  drawChaosBackground(now);
+  state.cookingObjects.forEach(object => drawChaosObject(object, now));
+  state.cookingParticles.forEach(particle => {
+    const alpha = Math.max(0, 1 - particle.age / particle.life);
+    chaosCtx.save();
+    chaosCtx.globalAlpha = alpha;
+    chaosCtx.fillStyle = particle.color;
+    chaosCtx.beginPath();
+    chaosCtx.arc(particle.x, particle.y, particle.size * alpha, 0, Math.PI * 2);
+    chaosCtx.fill();
+    chaosCtx.restore();
+  });
+
+  updateChaosHud();
+  state.cookingRaf = requestAnimationFrame(renderCookingChaos);
 }
 
 function startCookingChaos() {
   stopCookingChaos();
-  state.cookingChaosTick = Math.floor(Math.random() * COOKING_CHAOS_LABELS.length);
-  renderCookingChaos();
-  state.cookingChaosTimer = window.setInterval(renderCookingChaos, 720);
+  resetLoadingGallery();
+  state.cookingStartedAt = performance.now();
+  state.cookingLastFrameAt = state.cookingStartedAt;
+  state.cookingNextSpawnAt = state.cookingStartedAt;
+  state.cookingRaf = 1;
+  for (let i = 0; i < 6; i += 1) spawnChaosObject(state.cookingStartedAt - i * 120);
+  state.cookingRaf = requestAnimationFrame(renderCookingChaos);
 }
 
 function stopCookingChaos() {
-  if (state.cookingChaosTimer) window.clearInterval(state.cookingChaosTimer);
-  state.cookingChaosTimer = 0;
+  if (state.cookingRaf) cancelAnimationFrame(state.cookingRaf);
+  state.cookingRaf = 0;
+}
+
+async function finishCookingChaos() {
+  setCookingProgress(1);
+  state.cookingProgressDisplay = 1;
+  state.cookingReady = true;
+  updateChaosHud();
+  if (chaosReady) chaosReady.hidden = false;
+  if (loadingProgress) loadingProgress.textContent = 'Ready.';
+  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  await sleep(reduced ? 120 : 650);
 }
 
 function updateLoadingGallery(results, completed, total) {
   const ready = results.filter(Boolean).length;
-  loadingProgress.textContent = `${completed}/${total} keyframes processed · ${ready} ready · story hidden until reveal`;
+  const fraction = total ? completed / total : 0;
+  setCookingProgress(.22 + fraction * .6);
+  if (loadingProgress) loadingProgress.textContent = `${ready} visual beats ready.`;
 }
 
 function nextTrendPrompt() {
@@ -608,7 +843,7 @@ function summarizeVisualSources(sources, reusedCount, errors = []) {
   if (reusedCount) parts.push(`reused ${reusedCount}`);
   if (parts.length) return parts.join(' · ');
   const reason = errors.find(Boolean);
-  return reason ? `story-card fallback · ${reason}` : 'story-card fallback';
+  return reason ? `cinematic fallback · ${reason}` : 'cinematic fallback';
 }
 
 function nearestImageIndex(results, target) {
@@ -867,6 +1102,7 @@ async function generate(promptValue) {
   }
 
   if (token !== state.generateToken) return;
+  setCookingProgress(.18);
   const continuity = generated.continuity || {};
   const scenes = normalizeScenes(generated.scenes, validation.prompt, visualStyle, continuity);
   state.story = { scenes, prompt: validation.prompt, continuity, visualStyle };
@@ -878,7 +1114,8 @@ async function generate(promptValue) {
   setSources();
   drawFrame(0);
 
-  setStatus('Story cooked. Building scene imagery and narration in parallel…', 'busy');
+  setStatus('Generating.', 'busy');
+  setCookingProgress(.24);
   const visualPromise = generateSceneImages(token);
   const narrationPromise = requestNarrationWithFallback(narrationText()).then(narration => {
     if (token !== state.generateToken) return;
@@ -887,6 +1124,7 @@ async function generate(promptValue) {
     state.voiceSource = narration.voiceMode === 'dual'
       ? `${narration.source} · story-matched · 2 voices`
       : `${narration.source} · story-matched`;
+    setCookingProgress(.86);
     setSources();
   }).catch(() => {
     if (token !== state.generateToken) return;
@@ -894,6 +1132,7 @@ async function generate(promptValue) {
     state.narrationPlaybackRate = 1;
     state.narrationPlaybackSeconds = TARGET_SECONDS;
     state.voiceSource = 'device speechSynthesis';
+    setCookingProgress(.84);
     setSources();
   });
 
@@ -905,6 +1144,7 @@ async function generate(promptValue) {
   resultStyle.textContent = getVisualStylePreset(visualStyle).label;
   setGenerating(false);
   updateWordMeter();
+  await finishCookingChaos();
   stopCookingChaos();
   setView('result');
   updatePlaybackControls();
@@ -913,9 +1153,9 @@ async function generate(promptValue) {
   } else if (readyImages > 0 && state.visualCoveredCount === scenes.length) {
     setStatus(`Ready. ${readyImages}/8 fresh AI keyframes generated; missing beats reuse the nearest generated imagery so all 32 shots stay visual.`, 'ok');
   } else if (readyImages > 0) {
-    setStatus(`Ready. ${readyImages}/8 fresh AI keyframes are live; remaining shots use the story-card fallback.`, 'warn');
+    setStatus(`Ready. ${readyImages}/8 fresh AI keyframes are live; remaining shots use the cinematic fallback.`, 'warn');
   } else {
-    setStatus('Ready. All image providers were unavailable, so the story-card fallback is carrying the 32 shots.', 'warn');
+    setStatus('Ready. All image providers were unavailable, so the cinematic fallback is carrying the 32 shots.', 'warn');
   }
 }
 
@@ -1510,6 +1750,7 @@ function drawWelcome(label = 'READY TO ROT') {
 installBtn?.addEventListener('click', installApp);
 refreshInstallUi();
 
+chaosCanvas?.addEventListener('pointerdown', handleChaosTap);
 promptInput.addEventListener('input', updateWordMeter);
 genBtn.addEventListener('click', () => generate(promptInput.value));
 quickBtn.addEventListener('click', () => {
