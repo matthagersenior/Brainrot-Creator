@@ -90,32 +90,41 @@
 
     <section id="cookingView" class="app-view cooking-view" hidden aria-labelledby="cookingTitle">
       <div class="cooking-inner">
-        <div class="cooking-mark" aria-hidden="true">💀</div>
-        <p class="eyebrow">THE ROT IS COOKING</p>
-        <h2 id="cookingTitle">Building your one-minute disaster…</h2>
-        <p id="loadingProgress" class="loading-progress">Cooking 32 linked shots behind a spoiler shield.</p>
+        <header class="chaos-head">
+          <div>
+            <p class="eyebrow">CHAOS BREAK</p>
+            <h2 id="cookingTitle">Tap everything.</h2>
+          </div>
+          <div class="chaos-scoreboard" aria-label="Chaos Tap score">
+            <span>SCORE <b id="chaosScore">0</b></span>
+            <span>COMBO <b id="chaosCombo">×1</b></span>
+          </div>
+        </header>
 
-        <div id="loadingGallery" class="loading-gallery" aria-label="Story-blind Brainrot cooking animation">
-          <div class="loading-tile"><span>CHAOS</span></div>
-          <div class="loading-tile"><span>CHAOS</span></div>
-          <div class="loading-tile"><span>CHAOS</span></div>
-          <div class="loading-tile"><span>CHAOS</span></div>
-          <div class="loading-tile"><span>CHAOS</span></div>
-          <div class="loading-tile"><span>CHAOS</span></div>
-          <div class="loading-tile"><span>CHAOS</span></div>
-          <div class="loading-tile"><span>CHAOS</span></div>
+        <div id="chaosGameShell" class="chaos-game-shell">
+          <canvas id="chaosCanvas" width="720" height="1040" aria-label="Chaos Tap mini-game. Tap moving objects for points while your video is prepared."></canvas>
+          <div class="chaos-progress" aria-label="Generation progress">
+            <svg viewBox="0 0 44 44" aria-hidden="true">
+              <circle class="chaos-progress-track" cx="22" cy="22" r="18"></circle>
+              <circle id="chaosProgressRing" class="chaos-progress-ring" cx="22" cy="22" r="18"></circle>
+            </svg>
+            <b id="chaosProgressText">0%</b>
+          </div>
+          <div id="chaosReady" class="chaos-ready" hidden aria-live="polite">
+            <strong>FULLY COOKED</strong>
+            <span>opening your rot…</span>
+          </div>
+          <div class="chaos-tip">TAP THE CHAOS · KEEP THE COMBO ALIVE</div>
         </div>
 
-        <div class="status-box cooking-status" role="status" aria-live="polite">
+        <div class="cooking-accessibility" aria-live="polite">
           <span id="statusDot" class="status-dot busy"></span>
-          <span id="statusText">Writing the story…</span>
-        </div>
-
-        <div class="sources cooking-sources" aria-label="Current generation sources">
-          <span class="source-pill">Story: <b id="storySource">local fallback</b></span>
-          <span class="source-pill">Voice: <b id="voiceSource">AI voice pending</b></span>
-          <span class="source-pill">Visuals: <b id="visualSource">Cloudflare → quality fallback</b></span>
-          <span class="source-pill">Trends: <b id="trendSourcePill">built-in rotation</b></span>
+          <span id="statusText">Generating.</span>
+          <span id="loadingProgress">Preparing your video.</span>
+          <span id="storySource">local fallback</span>
+          <span id="voiceSource">AI voice pending</span>
+          <span id="visualSource">AI imagery pending</span>
+          <span id="trendSourcePill">built-in rotation</span>
         </div>
       </div>
     </section>
