@@ -124,7 +124,10 @@ function buildPerformancePrompt(text, visualStyle, moods, transcript) {
     transcript
       ? 'There are exactly two performance roles. Narrator reads only Narrator lines. Character reads only Character lines. Do not speak the role labels.'
       : 'Use one narrator voice, but naturally change intensity and emotion as the story escalates.',
-    'Keep the total performance tight enough for an approximately 60-second vertical short. Preserve comedic timing without long pauses.',
+    'Aim for roughly 52 to 56 seconds of spoken performance inside the 60-second short so the ending can breathe.',
+    'Use human rhythm instead of constant cadence: tiny pauses after commas, clear sentence-ending pauses, and a slightly longer beat between story scenes.',
+    'Do not rush the final words of a sentence, do not machine-gun lists, and do not stretch vowels just to hit a duration target.',
+    'Preserve comedic timing with purposeful micro-pauses; natural delivery matters more than filling every second.',
     '',
     'Exact script:',
     exactScript,
