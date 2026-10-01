@@ -59,7 +59,7 @@ test('polished app shell exposes install affordance and automatic voice-cast sta
 
   assert.match(html, /INSTALL APP/);
   assert.match(html, /AUTO VOICE CAST/);
-  assert.match(html, /id="wordMeter">0 \/ 60 words<\/span>/);
+  assert.match(html, /id="wordMeter"[^>]*>0 \/ 60 words<\/span>/);
   assert.match(css, /\.app-utility/);
   assert.match(css, /\.install-btn/);
   assert.match(css, /backdrop-filter/);
