@@ -1667,7 +1667,6 @@ function drawFrame(seconds) {
   if (!frame) return;
   const { scene, sceneIndex, words, localWordIndex, microShot, microProgress } = frame;
   const progress = Math.max(0, Math.min(1, (seconds - scene.start) / Math.max(scene.duration, .001)));
-  const factor = chaosFactor();
 
   ctx.save();
   ctx.fillStyle = '#05070a';
@@ -1685,24 +1684,6 @@ function drawFrame(seconds) {
   bottomFade.addColorStop(1, 'rgba(0,0,0,.86)');
   ctx.fillStyle = bottomFade;
   ctx.fillRect(0, 720, 720, 500);
-
-  const tinyShake = Math.sin(seconds * 17 + sceneIndex) * 1.8 * factor;
-  ctx.translate(tinyShake, 0);
-  ctx.fillStyle = 'rgba(0,0,0,.58)';
-  roundedRect(28, 28, 664, 82, 22);
-  ctx.fill();
-  ctx.fillStyle = '#ffffff';
-  ctx.font = '850 20px ui-sans-serif, system-ui, sans-serif';
-  ctx.textAlign = 'left';
-  const shotLabel = microShot ? ` · SHOT ${microShot.shotIndex + 1}/4` : '';
-  ctx.fillText(`SCENE ${sceneIndex + 1}/8${shotLabel}`, 54, 61);
-  ctx.fillStyle = scene.color;
-  ctx.font = '900 25px Impact, Arial Black, sans-serif';
-  ctx.fillText(scene.burst, 54, 91);
-  ctx.textAlign = 'right';
-  ctx.fillStyle = 'rgba(255,255,255,.68)';
-  ctx.font = '750 18px ui-sans-serif, system-ui, sans-serif';
-  ctx.fillText(`${String(Math.floor(seconds)).padStart(2, '0')}s / 60s`, 666, 74);
 
   const captionStillSpeaking = !state.audioBuffer || seconds <= state.narrationPlaybackSeconds + 0.35;
   if (captionStillSpeaking) drawCaption(words, localWordIndex);
