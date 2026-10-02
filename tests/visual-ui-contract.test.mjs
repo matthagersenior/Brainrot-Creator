@@ -166,3 +166,14 @@ test('playback keeps voice cadence natural and uses film-style transitions inste
   assert.match(app, /blur\(/);
   assert.doesNotMatch(app, /STORY SHOT/);
 });
+
+
+test('rendered video keeps scene and shot metadata off the image', async () => {
+  const app = await readFile(new URL('app.mjs', root), 'utf8');
+  const drawFrame = app.slice(app.indexOf('function drawFrame'), app.indexOf('function drawWelcome'));
+
+  assert.doesNotMatch(drawFrame, /SCENE\s*\$\{/);
+  assert.doesNotMatch(drawFrame, /SHOT\s*\$\{/);
+  assert.doesNotMatch(drawFrame, /scene\.burst/);
+  assert.doesNotMatch(drawFrame, /s \/ 60s/);
+});
