@@ -7,10 +7,10 @@ const STORY_MODELS = ['gemini-3.1-flash-lite', 'gemini-3.6-flash'];
 const RETRYABLE_PROVIDER_STATUS = new Set([404, 429, 500, 502, 503, 504]);
 const MODEL_TIMEOUT_MS = 30_000;
 const VISUAL_STYLES = {
-  'cursed-real': 'cursed realistic live-action photography: believable physical materials, natural anatomy, practical lighting, subtly uncanny details, no cartoon, no anime',
-  photoreal: 'photorealistic documentary photography: natural textures, plausible anatomy and scale, real-world lighting, no cartoon, no anime, no illustration',
-  cinematic: 'cinematic live-action film stills: realistic production design, motivated lighting, shallow depth of field, restrained color grade, no cartoon or anime',
-  cartoon: 'stylized brainrot cartoon: bold illustrated forms, expressive shapes, intentionally non-photorealistic',
+  'cursed-real': 'contemporary brainrot visual language: original surreal AI meme character, animal-object or mascot-object hybrid where appropriate, uncanny polished 3D-photoreal materials, exaggerated memorable silhouette, absurd prop fusion, practical lighting, short-form social-video energy, no copied named meme character',
+  photoreal: 'photoreal brainrot meme world: original surreal hybrid protagonist, convincing real materials, uncanny coherent anatomy, bold absurd object fusion, repeatable silhouette, real-world lighting, no copied named meme character',
+  cinematic: 'cinematic brainrot meme world: original surreal hybrid protagonist with a memorable mascot-like silhouette, absurd physical mashup rendered as premium live-action VFX, dramatic short-form framing, motivated lighting, shallow depth of field',
+  cartoon: 'stylized contemporary brainrot cartoon: original absurd hybrid meme character, exaggerated silhouette and reactions, object-animal mashup, bold saturated color, chaotic short-form comedy energy',
 };
 
 const STRING_FIELD = { type: 'string' };
@@ -156,15 +156,16 @@ Rules:
 - Write for spoken rhythm: vary sentence length, use clean punctuation, and leave room for micro-pauses between beats instead of cramming clauses together.
 - Hook immediately in scene 1, escalate through scenes 2-6, callback in scene 7, punchline/final verdict in scene 8.
 - Every scene must depict the literal story beat being narrated. Do not generate unrelated generic meme imagery.
+- Build the short around one recurring meme-worthy AI character with a simple instantly recognizable design. Favor an original surreal hybrid or absurd mascot-like creature when the prompt allows it: fuse an animal, object, food, machine, clothing item, or everyday thing into one coherent character. Keep that character original rather than copying a named existing meme.
 - Keep the same recurring subject, appearance, world, and recurring props visually consistent across all 8 scenes.
 - Keep the recurring protagonist clearly visible and recognizable in at least 6 of the 8 scene prompts; avoid empty environments or abstract-only shots.
 - visualPrompt must describe concrete visible people/creatures, objects, location, physical action, camera framing, and lighting. It must not ask the image model to depict abstract concepts such as aura, rizz, energy, gravity, loop, lore, side quest, confusion, or fear as text, symbols, fog, blobs, or graphics.
 - If an abstract story idea matters, translate it into a visible physical event or character reaction instead.
 - visualPrompt must include vertical 9:16 social-video framing, the scene's subject, setting, action, camera, mood, continuity details, and the requested style.
 - Keep any signs, screens, paperwork, labels, posters, license plates, or displays blank, unreadable, defocused, or too small to read.
-- Unless the selected style is cartoon, explicitly avoid cartoon, anime, illustration, emoji, mascot, toy-like, and flat-vector aesthetics.
+- Unless the selected style is cartoon, render the brainrot character with convincing materials, lighting, depth, and physical presence rather than flat-vector, emoji, or simple clip-art aesthetics. A mascot-like silhouette is welcome; cheap mascot rendering is not.
 - visualPrompt must say there should be no text, subtitles, logos, watermarks, UI, or speech bubbles inside the generated image.
-- Brainrot pacing: meme logic, fake lore, aura/rizz/side-quest energy, surprising escalation, quotable lines. Do not merely repeat slang.
+- Brainrot pacing: meme logic, fake lore, absurd hybrid-character behavior, escalating visual jokes, surprising physical transformations or props, quotable lines, and fast short-form readability. Do not merely repeat slang.
 - Include 2 to 4 short direct quotes, written with standard double quotes, from the same recurring featured character across at least two scenes between scenes 2-7.
 - Each direct quote should be 2 to 8 spoken words and feel natural to that story beat. The same recurring featured character must speak every quoted line so two-speaker TTS can give that character one consistent second voice while the narrator remains the first voice.
 - color must be a six-digit hex color used only for UI/caption accenting.

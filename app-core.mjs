@@ -19,19 +19,19 @@ const MODIFIERS = [
 export const VISUAL_STYLE_PRESETS = Object.freeze({
   'cursed-real': Object.freeze({
     label: 'CURSED REAL',
-    prompt: 'cursed realistic photography, believable physical materials, natural anatomy, practical lighting, subtle uncanny details, social-video realism, no cartoon, no anime, no flat illustration',
+    prompt: 'contemporary brainrot visual language, original surreal AI meme character, animal-object or mascot-object hybrid when it fits the prompt, uncanny polished 3D-photoreal texture, exaggerated memorable silhouette, absurd prop mashup, short-form social-video energy, believable lighting, no copied named meme character, no anime, no flat vector art',
   }),
   photoreal: Object.freeze({
     label: 'PHOTOREAL',
-    prompt: 'photorealistic photography, natural skin and material texture, realistic lighting, plausible anatomy and scale, documentary detail, no cartoon, no anime, no illustration',
+    prompt: 'photoreal brainrot meme world, original surreal hybrid protagonist rendered with convincing real materials and lighting, uncanny but coherent anatomy, bold absurd object fusion, recognizable repeatable silhouette, documentary detail, short-form meme energy, no copied named meme character, no anime, no flat illustration',
   }),
   cinematic: Object.freeze({
     label: 'CINEMATIC',
-    prompt: 'cinematic live-action film still, realistic production design, motivated lighting, shallow depth of field, natural textures, restrained color grade, no cartoon, no anime',
+    prompt: 'cinematic brainrot meme world, original surreal hybrid protagonist with a memorable mascot-like silhouette, absurd physical mashup rendered as premium live-action VFX, dramatic short-form framing, motivated lighting, shallow depth of field, natural textures, no copied named meme character, no anime',
   }),
   cartoon: Object.freeze({
     label: 'BRAINROT CARTOON',
-    prompt: 'stylized brainrot cartoon, expressive shapes, bold color, exaggerated comic energy, intentionally illustrated rather than photorealistic',
+    prompt: 'stylized contemporary brainrot cartoon, original absurd hybrid meme character, exaggerated silhouette and facial reaction, object-animal mashup, bold saturated color, chaotic short-form comedy energy, highly recognizable recurring design, no copied named meme character',
   }),
 });
 

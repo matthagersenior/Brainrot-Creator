@@ -5,10 +5,10 @@ const JSON_HEADERS = {
 
 const MODEL = '@cf/black-forest-labs/flux-1-schnell';
 const STYLE_PROMPTS = {
-  'cursed-real': 'cursed realistic photography, believable physical materials, natural anatomy, practical lighting, subtle uncanny details, no cartoon, no anime, no flat illustration',
-  photoreal: 'photorealistic photography, natural textures, realistic anatomy and scale, documentary detail, no cartoon, no anime, no illustration',
-  cinematic: 'cinematic live-action film still, realistic production design, motivated lighting, shallow depth of field, natural textures, no cartoon, no anime',
-  cartoon: 'stylized brainrot cartoon, illustrated, bold expressive shapes and color',
+  'cursed-real': 'contemporary brainrot short-form meme aesthetic, original surreal AI hybrid character, absurd animal-object or mascot-object fusion, uncanny polished 3D-photoreal materials, memorable silhouette, expressive face or body language, practical lighting, no copied named meme character',
+  photoreal: 'photoreal brainrot short-form meme aesthetic, original surreal hybrid protagonist, convincing real materials and uncanny coherent anatomy, absurd object fusion, repeatable silhouette, documentary detail, no copied named meme character',
+  cinematic: 'cinematic brainrot short-form meme aesthetic, original surreal hybrid protagonist, premium live-action VFX look, memorable mascot-like silhouette, absurd physical mashup, motivated lighting, shallow depth of field, no copied named meme character',
+  cartoon: 'stylized contemporary brainrot short-form meme aesthetic, original absurd hybrid character, exaggerated silhouette and reactions, object-animal mashup, bold saturated color and chaotic comedic energy',
 };
 
 function json(body, status = 200) {
@@ -54,6 +54,7 @@ export async function onRequestPost({ request, env }) {
     visualPrompt,
     'vertical 9:16 social-video composition',
     'show the described story action clearly',
+    'make the recurring character instantly readable at phone size with one strong silhouette, face, prop, and absurd visual hook',
     'no text, no subtitles, no logos, no watermarks, no UI, no speech bubbles',
   ].join('. ');
 
