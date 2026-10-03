@@ -272,3 +272,10 @@ test('initial creator UI keeps implementation details out of sight', async () =>
   assert.match(initialMarkup, /id="installHint"[^>]*hidden/);
   assert.doesNotMatch(initialMarkup, /standalone app experience|Google Trends|built-in rotation/i);
 });
+
+
+test('client uses resilient synchronized caption timing instead of raw sparse timestamps', async () => {
+  const app = await readFile(new URL('app.mjs', root), 'utf8');
+  assert.match(app, /syncedWordIndex/);
+  assert.match(app, /audioBuffer\?\.duration/);
+});
