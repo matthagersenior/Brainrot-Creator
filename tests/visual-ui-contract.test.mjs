@@ -207,3 +207,16 @@ test('video-first visuals animate between two generated anchors per scene withou
   assert.match(app, /16 motion frames|16 visual frames/i);
   assert.match(app, /state\.sceneImages/);
 });
+
+
+test('default generated visuals use a recognizable contemporary brainrot meme language rather than generic realism', async () => {
+  const core = await readFile(new URL('app-core.mjs', root), 'utf8');
+  const story = await readFile(new URL('functions/api/story.js', root), 'utf8');
+  const visual = await readFile(new URL('functions/api/visualize.js', root), 'utf8');
+
+  assert.match(core, /surreal AI meme|brainrot/i);
+  assert.match(core, /hybrid|mashup/i);
+  assert.match(story, /recurring meme-worthy AI character|surreal hybrid/i);
+  assert.doesNotMatch(story, /avoid[^\n]*mascot/i);
+  assert.match(visual, /short-form meme|brainrot/i);
+});
