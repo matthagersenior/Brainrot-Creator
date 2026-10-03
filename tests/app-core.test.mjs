@@ -163,3 +163,24 @@ test('timestamped narration selects the word actually being spoken', () => {
   assert.equal(core.timedWordIndex(timings, 4), 2);
   assert.equal(core.timedWordIndex([], 1), null);
 });
+
+
+test('loading-game missions turn tapping into small rotating objectives without blocking free play', () => {
+  const collect = core.createChaosMission(0);
+  assert.equal(collect.type, 'collect');
+  assert.equal(collect.target, 3);
+  assert.match(collect.label, /3/);
+
+  let mission = core.advanceChaosMission(collect, { glyph: collect.glyph, hit: true });
+  mission = core.advanceChaosMission(mission, { glyph: collect.glyph, hit: true });
+  assert.equal(mission.progress, 2);
+  assert.equal(mission.complete, false);
+
+  mission = core.advanceChaosMission(mission, { glyph: collect.glyph, hit: true });
+  assert.equal(mission.complete, true);
+
+  const selective = core.createChaosMission(3);
+  const wrong = core.advanceChaosMission(selective, { glyph: '🚫', hit: true });
+  assert.equal(wrong.progress, 0);
+  assert.equal(wrong.complete, false);
+});
