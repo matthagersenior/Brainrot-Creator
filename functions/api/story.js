@@ -46,8 +46,14 @@ const STORY_JSON_SCHEMA = {
           camera: STRING_FIELD,
           mood: STRING_FIELD,
           visualPrompt: STRING_FIELD,
+          visualBeats: {
+            type: 'array',
+            minItems: 2,
+            maxItems: 2,
+            items: STRING_FIELD,
+          },
         },
-        required: ['text', 'color', 'burst', 'subject', 'setting', 'action', 'camera', 'mood', 'visualPrompt'],
+        required: ['text', 'color', 'burst', 'subject', 'setting', 'action', 'camera', 'mood', 'visualPrompt', 'visualBeats'],
       },
     },
   },
@@ -156,6 +162,8 @@ Rules:
 - Write for spoken rhythm: vary sentence length, use clean punctuation, and leave room for micro-pauses between beats instead of cramming clauses together.
 - Hook immediately in scene 1, escalate through scenes 2-6, callback in scene 7, punchline/final verdict in scene 8.
 - Every scene must depict the literal story beat being narrated. Do not generate unrelated generic meme imagery.
+- For every scene, return visualBeats with exactly two ordered visual moments. visualBeats[0] must literally depict the first half of that scene's narration; visualBeats[1] must literally depict the later half or visible consequence. Keep them in narration order.
+- Each visual beat must name the concrete visible actor/object and physical action. If the narration says corn stalks dribble, the beat must visibly contain corn stalks physically bouncing a basketball; do not substitute a generic mascot pose.
 - Build the short around one recurring meme-worthy AI character with a simple instantly recognizable design. Favor an original surreal hybrid or absurd mascot-like creature when the prompt allows it: fuse an animal, object, food, machine, clothing item, or everyday thing into one coherent character. Keep that character original rather than copying a named existing meme.
 - Keep the same recurring subject, appearance, world, and recurring props visually consistent across all 8 scenes.
 - Keep the recurring protagonist clearly visible and recognizable in at least 6 of the 8 scene prompts; avoid empty environments or abstract-only shots.
