@@ -208,3 +208,27 @@ test('caption timing continues through the script when transcription stops early
   assert.ok(late >= 3);
   assert.equal(core.syncedWordIndex(timings, 4.5, 6, 4.5), 5);
 });
+
+
+test('normalized scenes ground imagery to narration and two ordered literal visual beats', () => {
+  const scenes = normalizeScenes([{
+    text: 'The corn stalks start aggressively dribbling while the robot dog watches in disbelief.',
+    color: '#ff2ec4',
+    burst: 'CORN BALL',
+    subject: 'the same chrome robot dog',
+    setting: 'an Ohio cornfield at sunset',
+    action: 'corn stalks bounce a basketball while the robot dog watches',
+    camera: 'vertical medium-wide tracking shot',
+    mood: 'deadpan sports absurdity',
+    visualPrompt: 'Unrelated robot holding a glowing ring on a blank stage.',
+    visualBeats: [
+      'corn stalks bend down and begin bouncing a basketball on the dirt',
+      'the basketball rebounds between the moving corn stalks while the robot dog reacts',
+    ],
+  }], 'robot dog in a cornfield', 'cursed-real');
+
+  assert.equal(scenes[0].visualBeats.length, 2);
+  assert.match(scenes[0].visualPrompt, /corn stalks start aggressively dribbling/i);
+  assert.match(scenes[0].visualPrompt, /corn stalks bend down and begin bouncing a basketball/i);
+  assert.doesNotMatch(scenes[0].visualPrompt, /glowing ring on a blank stage/i);
+});
