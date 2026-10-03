@@ -916,20 +916,6 @@ function summarizeVisualSources(sources, reusedCount, errors = []) {
   return reason ? `cinematic fallback · ${reason}` : 'cinematic fallback';
 }
 
-function nearestImageIndex(results, target) {
-  let best = -1;
-  let distance = Infinity;
-  results.forEach((image, index) => {
-    if (!image) return;
-    const nextDistance = Math.abs(index - target);
-    if (nextDistance < distance) {
-      distance = nextDistance;
-      best = index;
-    }
-  });
-  return best;
-}
-
 async function generateSceneImages(token) {
   if (!state.story) return 0;
   const scenes = state.story.scenes;
