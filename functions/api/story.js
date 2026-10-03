@@ -68,6 +68,14 @@ function cleanPrompt(value) {
   return String(value || '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 500);
 }
 
+function safeStoryText(value, max = 360) {
+  return String(value || '')
+    .replace(/[<>]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, max);
+}
+
 function countWords(value) {
   const text = String(value || '').trim();
   return text ? text.split(/\s+/).length : 0;
@@ -97,7 +105,7 @@ function parseJsonText(raw) {
 }
 
 function splitNarrationForVisuals(text) {
-  const words = safeText(text, 360).split(/\s+/).filter(Boolean);
+  const words = safeStoryText(text, 360).split(/\s+/).filter(Boolean);
   if (!words.length) return ['', ''];
   const midpoint = Math.max(1, Math.ceil(words.length / 2));
   return [
@@ -108,12 +116,12 @@ function splitNarrationForVisuals(text) {
 
 function repairVisualBeats(scene) {
   const provided = Array.isArray(scene?.visualBeats)
-    ? scene.visualBeats.map(item => safeText(item, 320)).filter(Boolean).slice(0, 2)
+    ? scene.visualBeats.map(item => safeStoryText(item, 320)).filter(Boolean).slice(0, 2)
     : [];
   if (provided.length === 2) return provided;
 
   const [openingNarration, laterNarration] = splitNarrationForVisuals(scene?.text);
-  const action = safeText(scene?.action, 260) || 'the narrated physical action happens visibly';
+  const action = safeStoryText(scene?.action, 260) || 'the narrated physical action happens visibly';
   return [
     provided[0] || `Opening visible moment matching "${openingNarration}": ${action}`,
     provided[1] || `Later visible moment matching "${laterNarration}": show the physical consequence or continuation of ${action}`,
