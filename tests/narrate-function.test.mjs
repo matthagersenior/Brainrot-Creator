@@ -146,3 +146,64 @@ test('narration falls back to Gemini 2.5 Flash TTS on retryable 3.1 provider fai
     globalThis.fetch = originalFetch;
   }
 });
+
+
+test('narration uses Gemini 3.8 structured speech turns and returns real word timings from Workers AI', async () => {
+  const originalFetch = globalThis.fetch;
+  let requestedUrl = '';
+  let requestedBody = null;
+  const aiCalls = [];
+
+  globalThis.fetch = async (url, init = {}) => {
+    requestedUrl = String(url);
+    requestedBody = JSON.parse(String(init.body || '{}'));
+    return new Response(JSON.stringify({
+      output_audio: {
+        data: 'AAECAwQFBgcICQoLDA0ODw==',
+        mime_type: 'audio/l16',
+      },
+    }), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+
+  const AI = {
+    run: async (model, input) => {
+      aiCalls.push({ model, input });
+      return {
+        text: 'The frog entered the DMV and the room went completely silent.',
+        words: [
+          { word: 'The', start: 0.01, end: 0.12 },
+          { word: 'frog', start: 0.13, end: 0.34 },
+          { word: 'entered', start: 0.35, end: 0.65 },
+        ],
+      };
+    },
+  };
+
+  try {
+    const response = await onRequestPost({
+      request: narrationRequest({
+        text: 'The clerk blinked. "Absolutely not." The frog entered the DMV.',
+        visualStyle: 'cartoon',
+        moods: ['deadpan', 'chaotic'],
+      }),
+      env: { GEMINI_API_KEY: 'test-key', AI },
+    });
+    const body = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(requestedUrl, 'https://generativelanguage.googleapis.com/v1beta/interactions');
+    assert.equal(requestedBody.model, 'gemini-3.8-flash-tts');
+    assert.equal(requestedBody.response_format.mime_type, 'audio/l16');
+    assert.equal(requestedBody.response_format.sample_rate, 24000);
+    assert.ok(Array.isArray(requestedBody.input[0].content));
+    assert.ok(requestedBody.input[0].content.some(part => part.annotations?.[0]?.speaker === 'Narrator'));
+    assert.ok(requestedBody.input[0].content.some(part => part.annotations?.[0]?.speaker === 'Character'));
+    assert.ok(requestedBody.input[0].content.every(part => /speech_metadata/.test(part.annotations?.[0]?.type || '')));
+    assert.equal(aiCalls[0].model, '@cf/openai/whisper');
+    assert.ok(Array.isArray(aiCalls[0].input.audio));
+    assert.ok(body.wordTimings.length >= 3);
+    assert.equal(body.wordTimings[0].scriptIndex, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
