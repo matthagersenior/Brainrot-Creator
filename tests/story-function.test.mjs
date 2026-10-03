@@ -195,3 +195,42 @@ test('story planner requires two ordered visual moments that track the narrated 
     globalThis.fetch = originalFetch;
   }
 });
+
+
+test('story endpoint repairs missing visual beats before returning a successful story', async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => {
+    const scenes = Array.from({ length: 8 }, (_, index) => ({
+      text: `Scene ${index + 1} narrates a literal visible action in a strange room.`,
+      color: '#ff2ec4',
+      burst: 'TEST ROT',
+      subject: 'the same chrome robot dog',
+      setting: 'a strange room',
+      action: 'the robot dog pushes a shopping cart across the floor',
+      camera: 'vertical medium shot',
+      mood: 'deadpan absurdity',
+      visualPrompt: 'generic image prompt',
+    }));
+    return new Response(JSON.stringify({
+      candidates: [{ content: { parts: [{ text: JSON.stringify({
+        continuity: {
+          subject: 'chrome robot dog',
+          appearance: 'silver body with red eyes',
+          world: 'one strange room',
+          props: 'shopping cart',
+        },
+        scenes,
+      }) }] } }],
+    }), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+
+  try {
+    const response = await onRequestPost({ request: storyRequest(), env: { GEMINI_API_KEY: 'test-key' } });
+    const body = await response.json();
+    assert.equal(response.status, 200);
+    assert.ok(body.scenes.every(scene => Array.isArray(scene.visualBeats) && scene.visualBeats.length === 2));
+    assert.match(body.scenes[0].visualBeats[0], /shopping cart|visible action/i);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
