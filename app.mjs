@@ -1249,7 +1249,7 @@ async function generate(promptValue) {
   if (readyImages === targetFrames) {
     setStatus('Ready. 16 motion frames drive the 32 linked shots plus synchronized narration.', 'ok');
   } else if (readyImages > 0 && state.visualCoveredCount === scenes.length) {
-    setStatus(`Ready. ${readyImages}/16 visual frames generated; missing motion moments reuse their nearest anchor so the full short keeps moving.`, 'ok');
+    setStatus(`Ready. ${readyImages}/16 visual frames generated; missing motion moments reuse the nearest generated imagery so the full short keeps moving.`, 'ok');
   } else if (readyImages > 0) {
     setStatus(`Ready. ${readyImages}/16 visual frames are live; remaining beats use the cinematic motion fallback.`, 'warn');
   } else {
