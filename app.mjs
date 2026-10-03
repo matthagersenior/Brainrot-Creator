@@ -11,6 +11,9 @@ import {
   trendToPrompt,
   captionWindow,
   pacedWordIndex,
+  timedWordIndex,
+  createChaosMission,
+  advanceChaosMission,
   storyWordCount,
   normalizeVisualStyle,
   getVisualStylePreset,
@@ -78,6 +81,8 @@ const chaosScoreEl = document.getElementById('chaosScore');
 const chaosComboEl = document.getElementById('chaosCombo');
 const chaosProgressRing = document.getElementById('chaosProgressRing');
 const chaosProgressText = document.getElementById('chaosProgressText');
+const chaosMissionEl = document.getElementById('chaosMission');
+const chaosMissionProgressEl = document.getElementById('chaosMissionProgress');
 const chaosReady = document.getElementById('chaosReady');
 const resultTitle = document.getElementById('resultTitle');
 const resultStyle = document.getElementById('resultStyle');
@@ -129,6 +134,8 @@ const state = {
   speechWordIndex: null,
   narrationPlaybackRate: 1,
   narrationPlaybackSeconds: TARGET_SECONDS,
+  wordTimings: [],
+  timingSource: 'estimated',
   generateToken: 0,
   cookingRaf: 0,
   cookingLastFrameAt: 0,
@@ -142,6 +149,9 @@ const state = {
   cookingProgressTarget: 0,
   cookingProgressDisplay: 0,
   cookingReady: false,
+  cookingMissionIndex: -1,
+  cookingMission: null,
+  cookingMissionCompletedAt: 0,
 };
 
 function isStandaloneApp() {
@@ -229,6 +239,14 @@ function updateChaosHud() {
     const circumference = 113.1;
     chaosProgressRing.style.strokeDashoffset = String(circumference * (1 - progress));
   }
+
+  const mission = state.cookingMission;
+  if (chaosMissionEl && mission) {
+    chaosMissionEl.textContent = mission.complete ? 'MISSION COMPLETE +250' : mission.label;
+  }
+  if (chaosMissionProgressEl && mission) {
+    chaosMissionProgressEl.textContent = `${mission.progress}/${mission.target}`;
+  }
 }
 
 function resetLoadingGallery() {
@@ -240,6 +258,9 @@ function resetLoadingGallery() {
   state.cookingProgressTarget = 0.04;
   state.cookingProgressDisplay = 0;
   state.cookingReady = false;
+  state.cookingMissionIndex += 1;
+  state.cookingMission = createChaosMission(state.cookingMissionIndex);
+  state.cookingMissionCompletedAt = 0;
   if (chaosReady) chaosReady.hidden = true;
   if (loadingProgress) loadingProgress.textContent = 'Preparing your video.';
   updateChaosHud();
@@ -325,6 +346,12 @@ function handleChaosTap(event) {
     : 1;
   state.cookingLastHitAt = now;
   state.cookingScore += object.points * state.cookingCombo;
+  const previousMission = state.cookingMission;
+  state.cookingMission = advanceChaosMission(previousMission, { glyph: object.glyph, hit: true });
+  if (state.cookingMission?.complete && !previousMission?.complete) {
+    state.cookingScore += 250;
+    state.cookingMissionCompletedAt = now;
+  }
   burstChaos(object, x, y);
   if (navigator.vibrate) navigator.vibrate(8);
   updateChaosHud();
@@ -405,6 +432,16 @@ function renderCookingChaos(now) {
   if (!state.cookingReady && now >= state.cookingNextSpawnAt) spawnChaosObject(now);
   if (!state.cookingReady && now - state.cookingLastHitAt > 1250 && state.cookingCombo > 1) {
     state.cookingCombo = Math.max(1, state.cookingCombo - 1);
+  }
+  if (
+    !state.cookingReady
+    && state.cookingMission?.complete
+    && state.cookingMissionCompletedAt
+    && now - state.cookingMissionCompletedAt > 850
+  ) {
+    state.cookingMissionIndex += 1;
+    state.cookingMission = createChaosMission(state.cookingMissionIndex);
+    state.cookingMissionCompletedAt = 0;
   }
 
   state.cookingObjects.forEach(object => {
@@ -969,6 +1006,8 @@ async function requestNarration(text) {
     voiceMode: data.voiceMode || 'narrator',
     narratorVoice: data.narratorVoice || '',
     characterVoice: data.characterVoice || '',
+    wordTimings: Array.isArray(data.wordTimings) ? data.wordTimings : [],
+    timingSource: data.timingSource || 'estimated',
   };
 }
 
@@ -998,6 +1037,8 @@ async function requestPuterNarration(text) {
         voiceMode: 'narrator',
         narratorVoice: provider.options.voice || 'provider default',
         characterVoice: '',
+        wordTimings: [],
+        timingSource: 'estimated',
       };
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error || provider.label));
@@ -1042,6 +1083,10 @@ function canRecordNarratedVideo() {
   return Boolean(state.audioBuffer && canvas.captureStream && window.MediaRecorder && (window.AudioContext || window.webkitAudioContext));
 }
 
+function setWatchMode(enabled) {
+  document.body.classList.toggle('watch-mode', Boolean(enabled));
+}
+
 function updatePlaybackControls() {
   const ready = Boolean(state.story);
   playPauseBtn.disabled = !ready || state.recording;
@@ -1076,6 +1121,8 @@ async function generate(promptValue) {
   state.audioBuffer = null;
   state.narrationPlaybackRate = 1;
   state.narrationPlaybackSeconds = TARGET_SECONDS;
+  state.wordTimings = [];
+  state.timingSource = 'estimated';
   state.story = null;
   state.timeline = [];
   state.microTimeline = [];
@@ -1120,10 +1167,13 @@ async function generate(promptValue) {
   const narrationPromise = requestNarrationWithFallback(narrationText()).then(narration => {
     if (token !== state.generateToken) return;
     state.audioBuffer = narration.buffer;
+    state.wordTimings = narration.wordTimings || [];
+    state.timingSource = narration.timingSource || 'estimated';
     applyNarrationTiming(narration.buffer);
+    const syncLabel = state.wordTimings.length ? ' · word-synced' : '';
     state.voiceSource = narration.voiceMode === 'dual'
-      ? `${narration.source} · story-matched · 2 voices`
-      : `${narration.source} · story-matched`;
+      ? `${narration.source} · story-matched · 2 voices${syncLabel}`
+      : `${narration.source} · story-matched${syncLabel}`;
     setCookingProgress(.86);
     setSources();
   }).catch(() => {
@@ -1131,6 +1181,8 @@ async function generate(promptValue) {
     state.audioBuffer = null;
     state.narrationPlaybackRate = 1;
     state.narrationPlaybackSeconds = TARGET_SECONDS;
+    state.wordTimings = [];
+    state.timingSource = 'estimated';
     state.voiceSource = 'device speechSynthesis';
     setCookingProgress(.84);
     setSources();
@@ -1253,6 +1305,7 @@ async function play({ record = false } = {}) {
   state.recording = record;
   state.speechWordIndex = null;
   state.startedAt = performance.now();
+  setWatchMode(true);
   updatePlaybackControls();
   setStatus(record ? 'Recording the full story-synced minute locally…' : 'Now rotting…', 'busy');
 
@@ -1285,6 +1338,7 @@ async function pausePlayback() {
   state.playing = false;
   state.paused = true;
   state.pauseStartedAt = performance.now();
+  setWatchMode(false);
   if (state.raf) cancelAnimationFrame(state.raf);
   state.raf = 0;
   if (state.stopTimer) clearTimeout(state.stopTimer);
@@ -1304,6 +1358,7 @@ async function resumePlayback() {
   state.pauseStartedAt = 0;
   state.paused = false;
   state.playing = true;
+  setWatchMode(true);
   if (state.audioBuffer && state.audioContext?.state === 'suspended') {
     await state.audioContext.resume();
   } else if ('speechSynthesis' in window) {
@@ -1325,6 +1380,7 @@ function finishPlayback() {
   state.playing = false;
   state.paused = false;
   state.pauseStartedAt = 0;
+  setWatchMode(false);
   if (state.raf) cancelAnimationFrame(state.raf);
   state.raf = 0;
   if (state.stopTimer) clearTimeout(state.stopTimer);
@@ -1355,6 +1411,7 @@ function stopPlayback(resetCanvas = false) {
   state.playing = false;
   state.paused = false;
   state.pauseStartedAt = 0;
+  setWatchMode(false);
   state.recording = false;
   state.speechWordIndex = null;
   if (resetCanvas && state.story) drawFrame(0);
@@ -1394,23 +1451,24 @@ function sceneStateAtTime(seconds) {
   if (sceneIndex < 0) sceneIndex = timeline.length - 1;
   const microState = microShotStateAtTime(seconds);
   const scene = timeline[sceneIndex];
-  const words = scene.text.trim().split(/\s+/);
+  let words = scene.text.trim().split(/\s+/);
   const sceneProgress = (seconds - scene.start) / Math.max(scene.duration, .001);
   let localWordIndex = pacedWordIndex(words, sceneProgress);
-  if (!state.audioBuffer && Number.isInteger(state.speechWordIndex)) {
-    const map = globalWordMap();
+  const map = globalWordMap();
+
+  if (state.audioBuffer && state.wordTimings.length) {
+    const spokenSeconds = seconds * Math.max(0.01, state.narrationPlaybackRate || 1);
+    const globalIndex = timedWordIndex(state.wordTimings, spokenSeconds);
+    const mapped = Number.isInteger(globalIndex) ? map[globalIndex] : null;
+    if (mapped) {
+      words = timeline[mapped.sceneIndex].text.trim().split(/\s+/);
+      localWordIndex = mapped.localIndex;
+    }
+  } else if (!state.audioBuffer && Number.isInteger(state.speechWordIndex)) {
     const mapped = map[Math.min(map.length - 1, Math.max(0, state.speechWordIndex))];
     if (mapped) {
-      sceneIndex = mapped.sceneIndex;
+      words = timeline[mapped.sceneIndex].text.trim().split(/\s+/);
       localWordIndex = mapped.localIndex;
-      return {
-        scene: timeline[sceneIndex],
-        sceneIndex,
-        words: timeline[sceneIndex].text.trim().split(/\s+/),
-        localWordIndex,
-        microShot: microState?.shot || null,
-        microProgress: microState?.progress ?? 0,
-      };
     }
   }
   return {
@@ -1689,15 +1747,6 @@ function drawFrame(seconds) {
   if (captionStillSpeaking) drawCaption(words, localWordIndex);
   ctx.restore();
 
-  const totalProgress = Math.max(0, Math.min(1, seconds / TARGET_SECONDS));
-  ctx.fillStyle = 'rgba(0,0,0,.7)';
-  ctx.fillRect(0, 1256, 720, 24);
-  const progressGradient = ctx.createLinearGradient(0, 0, 720, 0);
-  progressGradient.addColorStop(0, '#ff2ec4');
-  progressGradient.addColorStop(.5, '#00e5ff');
-  progressGradient.addColorStop(1, '#c6ff00');
-  ctx.fillStyle = progressGradient;
-  ctx.fillRect(0, 1256, 720 * totalProgress, 24);
 }
 
 function drawWelcome(label = 'READY TO ROT') {
@@ -1732,6 +1781,11 @@ installBtn?.addEventListener('click', installApp);
 refreshInstallUi();
 
 chaosCanvas?.addEventListener('pointerdown', handleChaosTap);
+canvas.addEventListener('pointerup', () => {
+  if (state.currentView !== 'result' || state.recording) return;
+  if (state.playing) pausePlayback();
+  else if (state.paused) resumePlayback();
+});
 promptInput.addEventListener('input', updateWordMeter);
 genBtn.addEventListener('click', () => generate(promptInput.value));
 quickBtn.addEventListener('click', () => {

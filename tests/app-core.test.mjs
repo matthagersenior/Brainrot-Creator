@@ -146,3 +146,41 @@ test('punctuation-aware subtitle timing leaves a readable beat at sentence endin
   assert.equal(core.pacedWordIndex(words, 0.55), 0);
   assert.equal(core.pacedWordIndex(words, 0.99), 1);
 });
+
+
+test('timestamped narration selects the word actually being spoken', () => {
+  const timings = [
+    { word: 'The', start: 0.10, end: 0.28, scriptIndex: 0 },
+    { word: 'frog', start: 0.31, end: 0.62, scriptIndex: 1 },
+    { word: 'waits', start: 0.95, end: 1.24, scriptIndex: 2 },
+  ];
+
+  assert.equal(core.timedWordIndex(timings, 0.05), 0);
+  assert.equal(core.timedWordIndex(timings, 0.20), 0);
+  assert.equal(core.timedWordIndex(timings, 0.50), 1);
+  assert.equal(core.timedWordIndex(timings, 0.80), 1);
+  assert.equal(core.timedWordIndex(timings, 1.02), 2);
+  assert.equal(core.timedWordIndex(timings, 4), 2);
+  assert.equal(core.timedWordIndex([], 1), null);
+});
+
+
+test('loading-game missions turn tapping into small rotating objectives without blocking free play', () => {
+  const collect = core.createChaosMission(0);
+  assert.equal(collect.type, 'collect');
+  assert.equal(collect.target, 3);
+  assert.match(collect.label, /3/);
+
+  let mission = core.advanceChaosMission(collect, { glyph: collect.glyph, hit: true });
+  mission = core.advanceChaosMission(mission, { glyph: collect.glyph, hit: true });
+  assert.equal(mission.progress, 2);
+  assert.equal(mission.complete, false);
+
+  mission = core.advanceChaosMission(mission, { glyph: collect.glyph, hit: true });
+  assert.equal(mission.complete, true);
+
+  const selective = core.createChaosMission(3);
+  const wrong = core.advanceChaosMission(selective, { glyph: '🚫', hit: true });
+  assert.equal(wrong.progress, 0);
+  assert.equal(wrong.complete, false);
+});

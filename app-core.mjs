@@ -409,3 +409,55 @@ export function pacedWordIndex(words = [], progress = 0) {
   }
   return words.length - 1;
 }
+
+
+export function timedWordIndex(timings = [], seconds = 0) {
+  if (!Array.isArray(timings) || timings.length === 0) return null;
+  const time = Math.max(0, Number(seconds) || 0);
+  let active = timings[0];
+
+  for (const timing of timings) {
+    const start = Number(timing?.start);
+    if (!Number.isFinite(start)) continue;
+    if (start <= time) active = timing;
+    else break;
+  }
+
+  const index = Number(active?.scriptIndex);
+  return Number.isInteger(index) && index >= 0 ? index : null;
+}
+
+const CHAOS_MISSIONS = Object.freeze([
+  Object.freeze({ type: 'collect', glyph: '🐸', target: 3, label: 'TAP 3 FROGS' }),
+  Object.freeze({ type: 'streak', target: 5, label: 'HIT 5 IN A ROW' }),
+  Object.freeze({ type: 'total', target: 10, label: 'POP 10 THINGS' }),
+  Object.freeze({ type: 'selective', glyphs: Object.freeze(['🐸', '🍌', '🐟']), target: 6, label: 'ONLY 🐸 🍌 🐟 · HIT 6' }),
+]);
+
+export function createChaosMission(index = 0) {
+  const safeIndex = Math.abs(Number.parseInt(index, 10) || 0) % CHAOS_MISSIONS.length;
+  return {
+    ...CHAOS_MISSIONS[safeIndex],
+    index: safeIndex,
+    progress: 0,
+    complete: false,
+  };
+}
+
+export function advanceChaosMission(mission, event = {}) {
+  if (!mission || mission.complete || event.hit !== true) return mission;
+  const next = { ...mission };
+  const glyph = String(event.glyph || '');
+
+  if (next.type === 'collect') {
+    if (glyph === next.glyph) next.progress += 1;
+  } else if (next.type === 'streak' || next.type === 'total') {
+    next.progress += 1;
+  } else if (next.type === 'selective') {
+    if (Array.isArray(next.glyphs) && next.glyphs.includes(glyph)) next.progress += 1;
+  }
+
+  next.progress = Math.max(0, Math.min(next.target, next.progress));
+  next.complete = next.progress >= next.target;
+  return next;
+}

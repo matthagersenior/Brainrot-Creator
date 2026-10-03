@@ -15,21 +15,28 @@ function narrationRequest(body = {}) {
   });
 }
 
-function successfulTtsResponse() {
+function interactionTtsResponse() {
+  return new Response(JSON.stringify({
+    output_audio: {
+      data: 'AAECAwQFBgcICQoLDA0ODw==',
+      mime_type: 'audio/l16',
+    },
+  }), { status: 200, headers: { 'content-type': 'application/json' } });
+}
+
+function legacyTtsResponse() {
   return new Response(JSON.stringify({
     candidates: [{
       content: {
         parts: [{
-          inlineData: {
-            data: 'ZmFrZS1wY20tYXVkaW8=',
-          },
+          inlineData: { data: 'ZmFrZS1wY20tYXVkaW8=' },
         }],
       },
     }],
   }), { status: 200, headers: { 'content-type': 'application/json' } });
 }
 
-test('narration uses Gemini 3.1 Flash TTS and directs the narrator from story style and mood', async () => {
+test('narration prefers Gemini 3.8 expressive TTS and keeps style directions out of spoken text', async () => {
   const originalFetch = globalThis.fetch;
   let requestedUrl = '';
   let requestedBody = null;
@@ -37,7 +44,7 @@ test('narration uses Gemini 3.1 Flash TTS and directs the narrator from story st
   globalThis.fetch = async (url, init = {}) => {
     requestedUrl = String(url);
     requestedBody = JSON.parse(String(init.body || '{}'));
-    return successfulTtsResponse();
+    return interactionTtsResponse();
   };
 
   try {
@@ -48,35 +55,34 @@ test('narration uses Gemini 3.1 Flash TTS and directs the narrator from story st
     const body = await response.json();
 
     assert.equal(response.status, 200);
-    assert.match(requestedUrl, /gemini-3\.1-flash-tts-preview:generateContent$/);
-    assert.equal(body.source, 'gemini-3.1-flash-tts-preview');
+    assert.equal(requestedUrl, 'https://generativelanguage.googleapis.com/v1beta/interactions');
+    assert.equal(requestedBody.model, 'gemini-3.8-flash-tts');
+    assert.equal(requestedBody.response_format.mime_type, 'audio/l16');
+    assert.equal(requestedBody.response_format.sample_rate, 24000);
+    assert.equal(body.source, 'gemini-3.8-flash-tts');
     assert.equal(body.voiceMode, 'narrator');
-    assert.equal(body.visualStyle, 'cinematic');
+    assert.equal(body.narratorVoice, 'Gacrux');
 
-    const prompt = requestedBody.contents[0].parts[0].text;
-    assert.match(prompt, /cinematic/i);
-    assert.match(prompt, /ominous/i);
-    assert.match(prompt, /deadpan/i);
-    assert.match(prompt, /triumphant/i);
-    assert.match(prompt, /exact script/i);
-    assert.match(prompt, /52 to 56 seconds/i);
-    assert.match(prompt, /human rhythm/i);
-    assert.match(prompt, /do not rush/i);
-
-    const voiceName = requestedBody.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName;
-    assert.equal(voiceName, 'Gacrux');
+    const part = requestedBody.input[0].content[0];
+    assert.equal(part.text, 'The frog entered the DMV and the room went completely silent.');
+    assert.equal(part.annotations[0].type, 'speech_metadata');
+    assert.match(part.annotations[0].style, /cinematic/i);
+    assert.match(part.annotations[0].style, /ominous/i);
+    assert.match(part.annotations[0].style, /deadpan/i);
+    assert.match(part.annotations[0].style, /triumphant/i);
+    assert.match(part.annotations[0].style, /inflection|human reactions/i);
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
-test('quoted dialogue automatically uses a second character voice while preserving narrator voice', async () => {
+test('quoted dialogue receives a distinct second voice through structured speaker metadata', async () => {
   const originalFetch = globalThis.fetch;
   let requestedBody = null;
 
   globalThis.fetch = async (_url, init = {}) => {
     requestedBody = JSON.parse(String(init.body || '{}'));
-    return successfulTtsResponse();
+    return interactionTtsResponse();
   };
 
   try {
@@ -92,26 +98,26 @@ test('quoted dialogue automatically uses a second character voice while preservi
 
     assert.equal(response.status, 200);
     assert.equal(body.voiceMode, 'dual');
+    assert.equal(body.narratorVoice, 'Charon');
+    assert.equal(body.characterVoice, 'Enceladus');
 
-    const speech = requestedBody.generationConfig.speechConfig;
-    assert.ok(speech.multiSpeakerVoiceConfig);
-    assert.equal(speech.voiceConfig, undefined);
+    const parts = requestedBody.input[0].content;
+    assert.deepEqual(parts.map(part => part.annotations[0].speaker), ['Narrator', 'Character', 'Narrator']);
+    assert.equal(parts[1].text, 'Your aura expired yesterday.');
+    assert.match(parts[1].annotations[0].style, /character/i);
 
-    const speakers = speech.multiSpeakerVoiceConfig.speakerVoiceConfigs;
-    assert.deepEqual(speakers.map(item => item.speaker), ['Narrator', 'Character']);
-    assert.equal(speakers[0].voiceConfig.prebuiltVoiceConfig.voiceName, 'Charon');
-    assert.equal(speakers[1].voiceConfig.prebuiltVoiceConfig.voiceName, 'Enceladus');
-
-    const prompt = requestedBody.contents[0].parts[0].text;
-    assert.match(prompt, /Narrator:/);
-    assert.match(prompt, /Character: Your aura expired yesterday\./);
-    assert.match(prompt, /The whole DMV froze\./);
+    const speech = requestedBody.generation_config.speech_config;
+    assert.equal(speech.mode, 'conversational');
+    assert.deepEqual(speech.speakers, [
+      { speaker: 'Narrator', voice: 'Charon' },
+      { speaker: 'Character', voice: 'Enceladus' },
+    ]);
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
-test('narration falls back to Gemini 2.5 Flash TTS on retryable 3.1 provider failure', async () => {
+test('narration falls back to legacy Gemini TTS when 3.8 is unavailable', async () => {
   const originalFetch = globalThis.fetch;
   const requestedUrls = [];
 
@@ -123,7 +129,7 @@ test('narration falls back to Gemini 2.5 Flash TTS on retryable 3.1 provider fai
         headers: { 'content-type': 'application/json' },
       });
     }
-    return successfulTtsResponse();
+    return legacyTtsResponse();
   };
 
   try {
@@ -137,11 +143,59 @@ test('narration falls back to Gemini 2.5 Flash TTS on retryable 3.1 provider fai
     assert.deepEqual(
       requestedUrls.map(url => new URL(url).pathname),
       [
+        '/v1beta/interactions',
         '/v1beta/models/gemini-3.1-flash-tts-preview:generateContent',
-        '/v1beta/models/gemini-2.5-flash-preview-tts:generateContent',
       ],
     );
-    assert.equal(body.source, 'gemini-2.5-flash-preview-tts');
+    assert.equal(body.source, 'gemini-3.1-flash-tts-preview');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('finished AI narration is transcribed to word timestamps for exact caption highlighting', async () => {
+  const originalFetch = globalThis.fetch;
+  const aiCalls = [];
+
+  globalThis.fetch = async () => interactionTtsResponse();
+
+  const AI = {
+    run: async (model, input) => {
+      aiCalls.push({ model, input });
+      return {
+        text: 'The clerk blinked Absolutely not The frog entered the DMV',
+        words: [
+          { word: 'The', start: 0.01, end: 0.12 },
+          { word: 'clerk', start: 0.13, end: 0.31 },
+          { word: 'blinked', start: 0.32, end: 0.55 },
+          { word: 'Absolutely', start: 0.56, end: 0.90 },
+          { word: 'not', start: 0.91, end: 1.08 },
+          { word: 'The', start: 1.20, end: 1.32 },
+          { word: 'frog', start: 1.33, end: 1.50 },
+        ],
+      };
+    },
+  };
+
+  try {
+    const response = await onRequestPost({
+      request: narrationRequest({
+        text: 'The clerk blinked. "Absolutely not." The frog entered the DMV.',
+        visualStyle: 'cartoon',
+      }),
+      env: { GEMINI_API_KEY: 'test-key', AI },
+    });
+    const body = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(aiCalls[0].model, '@cf/openai/whisper');
+    assert.ok(Array.isArray(aiCalls[0].input.audio));
+    assert.ok(aiCalls[0].input.audio.length > 44);
+    assert.equal(body.timingSource, '@cf/openai/whisper');
+    assert.equal(body.wordTimings[0].scriptIndex, 0);
+    assert.equal(body.wordTimings[3].scriptIndex, 3);
+    assert.equal(body.wordTimings[4].scriptIndex, 4);
+    assert.equal(body.wordTimings[6].scriptIndex, 6);
   } finally {
     globalThis.fetch = originalFetch;
   }
