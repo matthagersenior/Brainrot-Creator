@@ -262,3 +262,13 @@ test('creator screen does not expose free-first implementation strategy', async 
 
   assert.doesNotMatch(creatorMarkup, /\$0-FIRST|FREE[- ]?FIRST|free-badge/i);
 });
+
+
+test('initial creator UI keeps implementation details out of sight', async () => {
+  const html = await readFile(new URL('index.html', root), 'utf8');
+  const initialMarkup = html.slice(html.indexOf('<body>'), html.indexOf('id="cookingView"'));
+
+  assert.doesNotMatch(initialMarkup, /AI SHORT CREATOR|AUTO VOICE CAST|id="trendSource"/i);
+  assert.match(initialMarkup, /id="installHint"[^>]*hidden/);
+  assert.doesNotMatch(initialMarkup, /standalone app experience|Google Trends|built-in rotation/i);
+});
