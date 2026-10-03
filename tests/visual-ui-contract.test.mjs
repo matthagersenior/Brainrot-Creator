@@ -247,3 +247,12 @@ test('real scene video stays compatible with the existing narrated canvas export
   assert.match(app, /syncSceneVideo/);
   assert.match(app, /video\.playbackRate/);
 });
+
+
+test('result screen shows the rot and actions without exposing implementation details', async () => {
+  const html = await readFile(new URL('index.html', root), 'utf8');
+  const resultMarkup = html.slice(html.indexOf('id="resultView"'), html.indexOf('<footer', html.indexOf('id="resultView"')));
+
+  assert.doesNotMatch(resultMarkup, /resultVisualSource|resultVoiceSource|downloadNote/);
+  assert.doesNotMatch(resultMarkup, /Visuals:|Voice:|Cloudflare|Gemini|motion-frame|720×1280|WebM/i);
+});
