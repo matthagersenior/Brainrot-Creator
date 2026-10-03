@@ -146,17 +146,20 @@ function fallbackContinuity(prompt) {
   };
 }
 
-function sceneVisualPrompt(scene, continuity, style) {
+function sceneVisualPrompt(scene, continuity, style, visualMoment = '') {
   const preset = getVisualStylePreset(style);
   return [
     preset.prompt,
     'vertical 9:16 social-video frame',
+    `exact narrated line: "${scene.text}"`,
+    `exact visible moment: ${visualMoment || scene.action}`,
     `recurring subject: ${continuity.subject}`,
     `continuity: ${continuity.appearance}`,
     `setting: ${scene.setting}`,
-    `action: ${scene.action}`,
+    `scene action: ${scene.action}`,
     `camera: ${scene.camera}`,
     `mood: ${scene.mood}`,
+    'the picture must visibly prove the narrated action; prioritize literal story objects and actions over generic character posing',
     'show a clear recognizable focal subject performing the described physical action in the literal location; do not turn abstract concepts into text, symbols, fog, blobs, or graphics',
     'keep signs, screens, paperwork, labels, and displays blank, unreadable, defocused, or too small to read',
     'no text, captions, logos, watermarks, UI, title cards, posters, or speech bubbles inside the generated image',
@@ -246,8 +249,15 @@ export function buildFallbackStory(promptValue, visualStyleValue = 'cursed-real'
       action: row.action,
       camera: row.camera,
       mood: row.mood,
+      visualBeats: [
+        `opening visible instant of this action: ${row.action}`,
+        `a clearly later visible consequence of the same action: ${row.action}`,
+      ],
     };
-    return { ...scene, visualPrompt: sceneVisualPrompt(scene, continuity, visualStyle) };
+    return {
+      ...scene,
+      visualPrompt: sceneVisualPrompt(scene, continuity, visualStyle, scene.visualBeats[0]),
+    };
   });
 
   return { scenes, continuity, visualStyle, source: 'local' };
@@ -276,14 +286,20 @@ export function normalizeScenes(input, promptValue = 'brainrot', visualStyleValu
       camera: safeField(candidate?.camera, fallbackScene.camera),
       mood: safeField(candidate?.mood, fallbackScene.mood),
     };
-    scene.visualPrompt = safeField(
-      candidate?.visualPrompt,
-      sceneVisualPrompt(scene, continuity, visualStyle),
-      1600,
+    const candidateBeats = Array.isArray(candidate?.visualBeats) ? candidate.visualBeats : [];
+    const fallbackBeats = Array.isArray(fallbackScene?.visualBeats) ? fallbackScene.visualBeats : [];
+    scene.visualBeats = [
+      safeField(candidateBeats[0], fallbackBeats[0] || scene.action, 320),
+      safeField(candidateBeats[1], fallbackBeats[1] || `visible continuation and consequence of: ${scene.action}`, 320),
+    ];
+    // Never trust a provider-authored image prompt over the actual narrated beat.
+    // Rebuild the prompt deterministically from the normalized story fields.
+    scene.visualPrompt = sceneVisualPrompt(
+      scene,
+      continuity,
+      visualStyle,
+      scene.visualBeats[0],
     );
-    if (!/vertical|9:16/i.test(scene.visualPrompt)) {
-      scene.visualPrompt = `${scene.visualPrompt}. vertical 9:16 social-video frame`;
-    }
     return scene;
   });
 }
