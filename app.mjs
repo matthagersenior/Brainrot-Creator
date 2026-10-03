@@ -36,6 +36,25 @@ const PUTER_TTS_FALLBACKS = Object.freeze([
   Object.freeze({ options: { voice: 'Joanna', engine: 'neural' }, label: 'Puter · neural voice' }),
 ]);
 
+const PUTER_VIDEO_MODELS = Object.freeze([
+  Object.freeze({
+    provider: 'byteplus-video-generation',
+    model: 'seedance-2-0-mini',
+    seconds: 5,
+    size: '480p',
+    width: 9,
+    height: 16,
+    label: 'Puter · Seedance 2.0 Mini',
+  }),
+  Object.freeze({
+    provider: 'together-video-generation',
+    model: 'bytedance/seedance-1.0-lite',
+    seconds: 5,
+    size: '416x960',
+    label: 'Puter · Seedance 1.0 Lite',
+  }),
+]);
+
 const CHAOS_OBJECTS = Object.freeze([
   Object.freeze({ glyph: '🐸', points: 15, scale: 1.05 }),
   Object.freeze({ glyph: '🍌', points: 10, scale: 1.0 }),
@@ -118,6 +137,10 @@ const state = {
   visualStyle: 'cursed-real',
   sceneImages: [],
   sceneFrames: [],
+  sceneVideos: [],
+  videoGeneratedCount: 0,
+  videoErrors: [],
+  activeVideoSceneIndex: -1,
   audioBuffer: null,
   audioContext: null,
   audioSource: null,
@@ -1008,6 +1031,261 @@ async function generateSceneImages(token) {
   return generatedFrames;
 }
 
+
+function sceneVideoPrompt(scene, sceneIndex) {
+  return [
+    'Animate this exact generated brainrot scene as a continuous vertical short-form video clip.',
+    `Scene ${sceneIndex + 1} subject: ${scene.subject}.`,
+    `Visible action: ${scene.action}.`,
+    `Camera movement: ${scene.camera}.`,
+    `Mood: ${scene.mood}.`,
+    'Preserve the exact recurring character identity, silhouette, face, materials, signature prop, outfit, environment, and screen direction from the supplied first and last frames.',
+    'Use visible character motion, expression changes, environmental movement, and purposeful camera motion. Do not turn this into a static zoom.',
+    'No text, captions, subtitles, logos, watermarks, UI, title cards, or speech bubbles.',
+    'Silent visual only; narration and captions are added separately by the app.',
+  ].join(' ');
+}
+
+function imageReferenceForVideo(image) {
+  const src = String(image?.src || '');
+  return /^(data:|https?:|blob:)/i.test(src) ? src : '';
+}
+
+async function fetchVideoBlob(src) {
+  try {
+    const response = await fetch(src, { mode: 'cors' });
+    if (!response.ok) throw new Error(`video download ${response.status}`);
+    return response.blob();
+  } catch (error) {
+    if (!window.puter?.net?.fetch) throw error;
+    const response = await window.puter.net.fetch(src);
+    if (!response?.ok) throw new Error(`Puter video download ${response?.status || 'failed'}`);
+    return response.blob();
+  }
+}
+
+async function localizePuterVideo(candidate, sourceLabel) {
+  const src = typeof candidate === 'string'
+    ? candidate
+    : candidate?.src || candidate?.currentSrc || '';
+  if (!src) throw new Error(`${sourceLabel} returned no video source`);
+
+  const blob = await fetchVideoBlob(src);
+  if (!blob?.size) throw new Error(`${sourceLabel} returned an empty video`);
+  const objectUrl = URL.createObjectURL(blob);
+  const video = document.createElement('video');
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = 'auto';
+  video.src = objectUrl;
+
+  await new Promise((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new Error(`${sourceLabel} video decode timed out`)), 20_000);
+    const done = () => {
+      window.clearTimeout(timer);
+      resolve();
+    };
+    const fail = () => {
+      window.clearTimeout(timer);
+      reject(new Error(`${sourceLabel} video decode failed`));
+    };
+    video.addEventListener('loadeddata', done, { once: true });
+    video.addEventListener('error', fail, { once: true });
+    video.load();
+  });
+
+  return {
+    element: video,
+    objectUrl,
+    source: sourceLabel,
+    duration: Math.max(0.1, Number(video.duration) || 5),
+  };
+}
+
+async function requestPuterSceneVideo(scene, sceneIndex, frames) {
+  if (!window.puter?.ai?.txt2vid) throw new Error('Puter video generation unavailable');
+  const firstFrame = imageReferenceForVideo(frames?.[0] || frames?.[1]);
+  const lastFrame = imageReferenceForVideo(frames?.[1] || frames?.[0]);
+  if (!firstFrame) throw new Error('scene has no generated image anchor for video');
+
+  const prompt = sceneVideoPrompt(scene, sceneIndex);
+  let lastError = new Error('No Puter video model was available.');
+
+  for (const provider of PUTER_VIDEO_MODELS) {
+    try {
+      const options = {
+        provider: provider.provider,
+        model: provider.model,
+        seconds: provider.seconds,
+        size: provider.size,
+        generate_audio: false,
+        input_reference: firstFrame,
+        ...(lastFrame ? { last_frame: lastFrame } : {}),
+        ...(provider.width ? { width: provider.width } : {}),
+        ...(provider.height ? { height: provider.height } : {}),
+      };
+      const candidate = await window.puter.ai.txt2vid(prompt, options);
+      return await localizePuterVideo(candidate, provider.label);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error || provider.label));
+    }
+  }
+
+  throw lastError;
+}
+
+function isFatalVideoGenerationError(error) {
+  const detail = String(error?.code || error?.error || error?.message || error || '').toLowerCase();
+  return /insufficient|credit|balance|unauthorized|auth|sign.?in|popup|permission|cancel/.test(detail);
+}
+
+function summarizeVideoSources(results) {
+  const counts = new Map();
+  results.filter(Boolean).forEach(entry => {
+    counts.set(entry.source, (counts.get(entry.source) || 0) + 1);
+  });
+  return [...counts.entries()].map(([source, count]) => `${source} ${count}`).join(' · ');
+}
+
+function pauseSceneVideos(reset = false) {
+  state.sceneVideos.forEach(entry => {
+    const video = entry?.element;
+    if (!video) return;
+    video.pause();
+    if (reset) {
+      try { video.currentTime = 0; } catch { /* metadata may not be ready */ }
+    }
+  });
+  state.activeVideoSceneIndex = -1;
+}
+
+function releaseSceneVideos() {
+  pauseSceneVideos(true);
+  state.sceneVideos.forEach(entry => {
+    if (entry?.objectUrl) URL.revokeObjectURL(entry.objectUrl);
+  });
+  state.sceneVideos = [];
+  state.videoGeneratedCount = 0;
+  state.videoErrors = [];
+}
+
+async function generateSceneVideos(token) {
+  if (!state.story || !state.sceneFrames.length) return 0;
+  const scenes = state.story.scenes;
+  const results = Array(scenes.length).fill(null);
+  const errors = Array(scenes.length).fill('');
+  const imageFallbackSource = state.visualSource;
+  let completed = 0;
+  let fatalError = null;
+
+  async function generateIndex(index) {
+    if (fatalError || token !== state.generateToken) return;
+    try {
+      results[index] = await requestPuterSceneVideo(
+        scenes[index],
+        index,
+        state.sceneFrames[index] || [],
+      );
+    } catch (error) {
+      errors[index] = String(error?.message || error || 'video generation failed').slice(0, 220);
+      if (isFatalVideoGenerationError(error)) fatalError = error;
+    }
+    completed += 1;
+    if (token !== state.generateToken) return;
+    state.sceneVideos = [...results];
+    state.videoGeneratedCount = results.filter(Boolean).length;
+    state.videoErrors = errors.filter(Boolean);
+    const ready = state.videoGeneratedCount;
+    const fallbackCount = scenes.length - ready;
+    const sources = summarizeVideoSources(results);
+    state.visualSource = ready
+      ? `${ready}/${scenes.length} real clips · ${sources}${fallbackCount ? ` · ${fallbackCount} motion-frame fallback` : ''}`
+      : `${imageFallbackSource} · motion-frame fallback`;
+    setCookingProgress(.64 + .32 * (completed / scenes.length));
+    setStatus(`Animating scene clips… ${completed}/${scenes.length}`, 'busy');
+    setSources();
+  }
+
+  // Let the first request handle any Puter authentication/credit prompt alone.
+  await generateIndex(0);
+  if (fatalError || token !== state.generateToken) {
+    state.videoErrors = errors.filter(Boolean);
+    state.visualSource = `${imageFallbackSource} · motion-frame fallback`;
+    setSources();
+    return 0;
+  }
+
+  let cursor = 1;
+  async function worker() {
+    while (cursor < scenes.length && !fatalError) {
+      const index = cursor;
+      cursor += 1;
+      await generateIndex(index);
+    }
+  }
+  await Promise.all([worker(), worker()]);
+  if (token !== state.generateToken) return 0;
+
+  const ready = results.filter(Boolean).length;
+  state.sceneVideos = results;
+  state.videoGeneratedCount = ready;
+  state.videoErrors = errors.filter(Boolean);
+  const fallbackCount = scenes.length - ready;
+  const sources = summarizeVideoSources(results);
+  state.visualSource = ready
+    ? `${ready}/${scenes.length} real clips · ${sources}${fallbackCount ? ` · ${fallbackCount} motion-frame fallback` : ''}`
+    : `${imageFallbackSource} · motion-frame fallback`;
+  setSources();
+  return ready;
+}
+
+function syncSceneVideo(sceneIndex, scene, sceneProgress) {
+  const entry = state.sceneVideos[sceneIndex];
+  const video = entry?.element;
+  if (!video || video.readyState < 2 || !Number.isFinite(video.duration)) return false;
+
+  const duration = Math.max(0.1, video.duration);
+  const targetTime = Math.max(0, Math.min(duration - 0.03, duration * Math.max(0, Math.min(1, sceneProgress))));
+  const sceneDuration = Math.max(0.1, Number(scene?.duration) || duration);
+  video.playbackRate = Math.max(0.5, Math.min(2, duration / sceneDuration));
+
+  if (state.activeVideoSceneIndex !== sceneIndex) {
+    state.sceneVideos.forEach((other, index) => {
+      if (index !== sceneIndex) other?.element?.pause();
+    });
+    state.activeVideoSceneIndex = sceneIndex;
+    try { video.currentTime = targetTime; } catch { /* seek can race metadata */ }
+  } else if (Math.abs(video.currentTime - targetTime) > 0.9) {
+    try { video.currentTime = targetTime; } catch { /* keep current frame */ }
+  }
+
+  if (state.playing && video.paused && !video.ended) {
+    video.play().catch(() => {});
+  }
+  return true;
+}
+
+function drawSceneVideo(video) {
+  if (!video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) return false;
+  const canvasRatio = canvas.width / canvas.height;
+  const videoRatio = video.videoWidth / video.videoHeight;
+  let sx = 0;
+  let sy = 0;
+  let sw = video.videoWidth;
+  let sh = video.videoHeight;
+
+  if (videoRatio > canvasRatio) {
+    sw = video.videoHeight * canvasRatio;
+    sx = (video.videoWidth - sw) / 2;
+  } else {
+    sh = video.videoWidth / canvasRatio;
+    sy = (video.videoHeight - sh) / 2;
+  }
+
+  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+  return true;
+}
+
 function ensureAudioContext() {
   if (!state.audioContext) {
     const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
@@ -1170,8 +1448,12 @@ async function generate(promptValue) {
   state.story = null;
   state.timeline = [];
   state.microTimeline = [];
+  releaseSceneVideos();
   state.sceneImages = [];
   state.sceneFrames = [];
+  state.sceneVideos = [];
+  state.videoGeneratedCount = 0;
+  state.videoErrors = [];
   state.visualStyle = visualStyle;
   state.storySource = 'local fallback';
   state.voiceSource = 'AI voice pending';
@@ -1209,6 +1491,11 @@ async function generate(promptValue) {
   setStatus('Generating.', 'busy');
   setCookingProgress(.24);
   const visualPromise = generateSceneImages(token);
+  const videoPromise = visualPromise.then(async () => {
+    if (token !== state.generateToken) return 0;
+    setCookingProgress(.62);
+    return generateSceneVideos(token);
+  });
   const narrationPromise = requestNarrationWithFallback(narrationText()).then(narration => {
     if (token !== state.generateToken) return;
     state.audioBuffer = narration.buffer;
@@ -1233,9 +1520,10 @@ async function generate(promptValue) {
     setSources();
   });
 
-  const [visualResult] = await Promise.allSettled([visualPromise, narrationPromise]);
+  const [visualResult, , videoResult] = await Promise.allSettled([visualPromise, narrationPromise, videoPromise]);
   if (token !== state.generateToken) return;
   const readyImages = visualResult.status === 'fulfilled' ? visualResult.value : 0;
+  const readyVideos = videoResult.status === 'fulfilled' ? videoResult.value : 0;
   drawFrame(0);
   resultTitle.textContent = validation.prompt;
   resultStyle.textContent = getVisualStylePreset(visualStyle).label;
@@ -1246,14 +1534,18 @@ async function generate(promptValue) {
   setView('result');
   updatePlaybackControls();
   const targetFrames = scenes.length * VISUAL_FRAMES_PER_SCENE;
-  if (readyImages === targetFrames) {
-    setStatus('Ready. 16 motion frames drive the 32 linked shots plus synchronized narration.', 'ok');
+  if (readyVideos === scenes.length) {
+    setStatus('Ready. Eight real AI scene clips drive the short with synchronized narration and captions.', 'ok');
+  } else if (readyVideos > 0) {
+    setStatus(`Ready. ${readyVideos}/8 real AI clips are live; remaining scenes use the verified motion-frame fallback.`, 'ok');
+  } else if (readyImages === targetFrames) {
+    setStatus('Ready. Video generation was unavailable, so 16 motion frames drive the 32 linked shots plus synchronized narration.', 'warn');
   } else if (readyImages > 0 && state.visualCoveredCount === scenes.length) {
-    setStatus(`Ready. ${readyImages}/16 visual frames generated; missing motion moments reuse the nearest generated imagery so the full short keeps moving.`, 'ok');
+    setStatus(`Ready. Video generation was unavailable; ${readyImages}/16 visual frames generated and missing moments reuse the nearest generated imagery.`, 'warn');
   } else if (readyImages > 0) {
-    setStatus(`Ready. ${readyImages}/16 visual frames are live; remaining beats use the cinematic motion fallback.`, 'warn');
+    setStatus(`Ready. Video generation was unavailable; ${readyImages}/16 visual frames are live and remaining beats use the cinematic fallback.`, 'warn');
   } else {
-    setStatus('Ready. Image providers were unavailable, so the cinematic animated fallback is carrying the short.', 'warn');
+    setStatus('Ready. Video and image providers were unavailable, so the cinematic animated fallback is carrying the short.', 'warn');
   }
 }
 
@@ -1389,6 +1681,7 @@ async function pausePlayback() {
   state.raf = 0;
   if (state.stopTimer) clearTimeout(state.stopTimer);
   state.stopTimer = 0;
+  pauseSceneVideos(false);
   if (state.audioBuffer && state.audioContext?.state === 'running') {
     await state.audioContext.suspend();
   } else if ('speechSynthesis' in window) {
@@ -1434,6 +1727,7 @@ function finishPlayback() {
   state.audioSource = null;
   if ('speechSynthesis' in window) window.speechSynthesis.cancel();
   drawFrame(TARGET_SECONDS);
+  pauseSceneVideos(false);
   if (state.recorder?.state === 'recording') state.recorder.stop();
   else state.recording = false;
   updatePlaybackControls();
@@ -1449,6 +1743,7 @@ function stopPlayback(resetCanvas = false) {
     try { state.audioSource.stop(); } catch { /* already stopped */ }
   }
   state.audioSource = null;
+  pauseSceneVideos(resetCanvas);
   if ('speechSynthesis' in window) window.speechSynthesis.cancel();
   if (state.recorder?.state === 'recording') {
     state.recordingAborted = true;
@@ -1659,6 +1954,9 @@ function drawSceneTransition(previousImage, previousMotion, image, motion, progr
 }
 
 function drawLinkedVisual(scene, sceneIndex, microShot, microProgress, sceneProgress) {
+  const videoEntry = state.sceneVideos[sceneIndex];
+  if (drawSceneVideo(videoEntry?.element)) return;
+
   const sourceImageIndex = microShot?.sourceImageIndex ?? sceneIndex;
   const pair = state.sceneFrames[sourceImageIndex] || [];
   const nearest = nearestImageIndex(state.sceneImages, sourceImageIndex);
@@ -1819,6 +2117,7 @@ function drawFrame(seconds) {
   if (!frame) return;
   const { scene, sceneIndex, words, localWordIndex, microShot, microProgress } = frame;
   const progress = Math.max(0, Math.min(1, (seconds - scene.start) / Math.max(scene.duration, .001)));
+  syncSceneVideo(sceneIndex, scene, progress);
 
   ctx.save();
   ctx.fillStyle = '#05070a';

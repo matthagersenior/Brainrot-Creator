@@ -47,3 +47,13 @@ test('production narration smoke check requires story-matched dual-voice metadat
   assert.match(workflow, /\.narratorVoice == "Charon"/);
   assert.match(workflow, /\.characterVoice == "Enceladus"/);
 });
+
+
+test('production smoke verifies the deployed bundle contains the real scene-video pipeline', async () => {
+  const workflow = await workflowText();
+  assert.match(workflow, /app\.mjs/);
+  assert.match(workflow, /txt2vid/);
+  assert.match(workflow, /requestPuterSceneVideo/);
+  assert.match(workflow, /sceneVideos/);
+  assert.match(workflow, /real scene-video bundle passed/i);
+});
