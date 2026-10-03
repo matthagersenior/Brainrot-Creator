@@ -91,6 +91,11 @@
 
         <div id="chaosGameShell" class="chaos-game-shell">
           <canvas id="chaosCanvas" width="720" height="1040" aria-label="Chaos Tap mini-game. Tap moving objects for points while your video is prepared."></canvas>
+          <div class="chaos-mission" aria-live="polite">
+            <span>MISSION</span>
+            <strong id="chaosMission">TAP 3 FROGS</strong>
+            <b id="chaosMissionProgress">0/3</b>
+          </div>
           <div class="chaos-progress" aria-label="Generation progress">
             <svg viewBox="0 0 44 44" aria-hidden="true">
               <circle class="chaos-progress-track" cx="22" cy="22" r="18"></circle>
@@ -129,7 +134,6 @@
 
         <div class="stage-shell result-stage-shell">
           <canvas id="videoCanvas" width="720" height="1280" aria-label="Generated vertical video canvas"></canvas>
-          <span class="canvas-badge">9:16 • 32 SHOTS</span>
         </div>
 
         <div class="result-controls">
