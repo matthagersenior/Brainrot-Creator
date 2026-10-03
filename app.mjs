@@ -1678,7 +1678,7 @@ function drawLinkedVisual(scene, sceneIndex, microShot, microProgress, sceneProg
   const previousImage = previousPair[1]
     || previousPair[0]
     || (Number.isInteger(transitionFromSceneIndex) ? state.sceneImages[transitionFromSceneIndex] : null);
-  const transitionWindow = 0.34;
+  const transitionWindow = 0.42;
 
   if (previousImage && microProgress < transitionWindow) {
     const previousShot = state.microTimeline
