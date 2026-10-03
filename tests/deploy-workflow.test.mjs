@@ -57,3 +57,16 @@ test('production smoke verifies the deployed bundle contains the real scene-vide
   assert.match(workflow, /sceneVideos/);
   assert.match(workflow, /real scene-video bundle passed/i);
 });
+
+
+test('production alias readiness waits for the real-video app bundle, not only generic HTML markers', async () => {
+  const workflow = await workflowText();
+  const start = workflow.indexOf('Waiting for Cloudflare production alias');
+  const end = workflow.indexOf('Live page passed.', start);
+  const readiness = workflow.slice(start, end);
+
+  assert.match(readiness, /\$base\/app\.mjs/);
+  assert.match(readiness, /txt2vid/);
+  assert.match(readiness, /requestPuterSceneVideo/);
+  assert.match(readiness, /sceneVideos/);
+});
