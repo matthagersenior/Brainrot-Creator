@@ -13,6 +13,10 @@ function successfulGeminiResponse() {
     camera: 'vertical handheld medium shot',
     mood: 'deadpan absurdity',
     visualPrompt: 'Photoreal frog waiting inside a DMV, vertical 9:16, no text.',
+    visualBeats: [
+      'the frog waits beneath the DMV number display holding a paper ticket',
+      'the frog looks up as its number is called and starts toward the counter',
+    ],
   }));
   return new Response(JSON.stringify({
     candidates: [{ content: { parts: [{ text: JSON.stringify({
@@ -71,7 +75,7 @@ test('story endpoint prefers Gemini 3.1 Flash-Lite and requires an eight-scene s
     assert.equal(requestedBody.generationConfig.responseJsonSchema.properties.scenes.maxItems, 8);
     assert.deepEqual(
       requestedBody.generationConfig.responseJsonSchema.properties.scenes.items.required,
-      ['text', 'color', 'burst', 'subject', 'setting', 'action', 'camera', 'mood', 'visualPrompt'],
+      ['text', 'color', 'burst', 'subject', 'setting', 'action', 'camera', 'mood', 'visualPrompt', 'visualBeats'],
     );
   } finally {
     globalThis.fetch = originalFetch;
@@ -164,6 +168,29 @@ test('story endpoint accepts a rich prompt above the old nine-word limit and pla
     const instructions = requestedBody.contents[0].parts[0].text;
     assert.match(instructions, /2 to 4 short direct quotes/i);
     assert.match(instructions, /same recurring featured character/i);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+
+test('story planner requires two ordered visual moments that track the narrated beat', async () => {
+  const originalFetch = globalThis.fetch;
+  let requestedBody = null;
+  globalThis.fetch = async (_url, init = {}) => {
+    requestedBody = JSON.parse(String(init.body || '{}'));
+    return successfulGeminiResponse();
+  };
+
+  try {
+    const response = await onRequestPost({ request: storyRequest(), env: { GEMINI_API_KEY: 'test-key' } });
+    assert.equal(response.status, 200);
+    const instructions = requestedBody.contents[0].parts[0].text;
+    assert.match(instructions, /exactly two ordered visual moments|two ordered visual/i);
+    assert.match(instructions, /first half.*second half|narration.*order/i);
+    const sceneSchema = requestedBody.generationConfig.responseJsonSchema.properties.scenes.items;
+    assert.equal(sceneSchema.properties.visualBeats.minItems, 2);
+    assert.equal(sceneSchema.properties.visualBeats.maxItems, 2);
   } finally {
     globalThis.fetch = originalFetch;
   }
