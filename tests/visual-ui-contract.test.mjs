@@ -43,7 +43,7 @@ test('creator keeps the multi-shot engine but strips explanatory copy from the v
   assert.doesNotMatch(html, /FREE MULTI-SHOT FORMAT|A richer prompt in|Describe the idea, characters, setting/i);
   assert.match(css, /\.creator-hidden-metrics/);
   assert.match(css, /min-height:\s*clamp\(190px,\s*30svh,\s*310px\)/);
-  assert.match(app, /Continue the immediately previous story beat/);
+  assert.match(app, /Preserve the recurring protagonist identity/);
   assert.match(app, /sceneCountEl\.textContent = state\.microTimeline\.length/);
 });
 
@@ -131,7 +131,7 @@ test('free-first fallback chain prioritizes quality providers before emergency H
   assert.match(app, /requestNarrationWithFallback/);
   assert.match(app, /txt2speech/);
   assert.match(app, /device speechSynthesis/);
-  assert.match(app, /nearest generated imagery/);
+  assert.doesNotMatch(app, /scheduled nearest-anchor reuse/);
 });
 
 test('quality-first image fallback uses Pollinations ahead of emergency Horde and rejects low-detail frames', async () => {
@@ -148,7 +148,7 @@ test('quality-first image fallback uses Pollinations ahead of emergency Horde an
   assert.match(app, /inspectImageQuality/);
   assert.match(app, /rejected low-detail frame/);
   assert.match(app, /graphic\/text-like frame/);
-  assert.match(app, /scheduled nearest-anchor reuse/);
+  assert.doesNotMatch(app, /scheduled nearest-anchor reuse/);
   assert.match(app, /do not visualize abstract words or concepts/);
 });
 
@@ -278,4 +278,15 @@ test('client uses resilient synchronized caption timing instead of raw sparse ti
   const app = await readFile(new URL('app.mjs', root), 'utf8');
   assert.match(app, /syncedWordIndex/);
   assert.match(app, /audioBuffer\?\.duration/);
+});
+
+
+test('image prompts follow exact narration beats and never borrow another scene image', async () => {
+  const app = await readFile(new URL('app.mjs', root), 'utf8');
+
+  assert.match(app, /scene\.visualBeats\?\.\[frameIndex\]/);
+  assert.match(app, /Narrated line|Exact narrated line/i);
+  assert.match(app, /Exact visible moment/i);
+  assert.doesNotMatch(app, /scheduled nearest-anchor reuse/);
+  assert.doesNotMatch(app, /nearestImageIndex\(state\.sceneImages/);
 });

@@ -653,36 +653,50 @@ function loadImage(dataURI) {
   });
 }
 
-function sceneVisualPrompt(scene, sceneIndex) {
-  return [
-    scene.visualPrompt,
-    sceneIndex > 0
-      ? 'Continue the immediately previous story beat: preserve the same recurring subject identity, appearance, world, props, lighting logic, and screen direction while advancing only the described action.'
-      : 'Establish the recurring subject, world, props, lighting logic, and screen direction clearly so following beats can continue from it.',
-  ].join(' ');
-}
-
-function motionFramePrompt(scene, sceneIndex, frameIndex) {
-  const moment = frameIndex === 0
-    ? 'Capture the opening motion moment of this beat with a strong readable pose and clear direction of movement.'
-    : 'Capture the same exact recurring character roughly one to two seconds later in the same beat: preserve face, body design, materials, signature prop, outfit, environment, and screen direction while visibly advancing the physical action, expression, and pose.';
-  return [
-    sceneVisualPrompt(scene, sceneIndex),
-    moment,
-    'This is one frame in a moving short, not a poster. Keep the composition compatible with the adjacent motion frame so a cross-dissolve and camera move feels like continuous video.',
-  ].join(' ');
-}
-
-function buildQualityFallbackPrompt(scene, visualStyle) {
+function sceneVisualPrompt(scene, sceneIndex, frameIndex, visualStyle) {
+  const exactMoment = scene.visualBeats?.[frameIndex] || scene.action;
   const stylePrompt = getVisualStylePreset(visualStyle).prompt;
   return [
     stylePrompt,
+    'vertical 9:16 social-video frame',
+    `Exact narrated line: "${scene.text}"`,
+    `Exact visible moment: ${exactMoment}`,
+    `Recurring protagonist: ${scene.subject}`,
+    `Literal location: ${scene.setting}`,
+    `Camera framing: ${scene.camera}`,
+    `Mood: ${scene.mood}`,
+    'The image must visibly prove the narrated event at this exact moment. Prioritize literal actors, objects, and physical actions named in the narration over generic mascot posing.',
+    sceneIndex > 0
+      ? 'Preserve the recurring protagonist identity, appearance, world, props, lighting logic, and screen direction from earlier scenes only where that does not conflict with the exact narrated action.'
+      : 'Establish the recurring protagonist identity and world clearly while still prioritizing the exact narrated action.',
+    'No text, captions, subtitles, logos, watermarks, UI, title cards, posters, or speech bubbles.',
+  ].join(' ');
+}
+
+function motionFramePrompt(scene, sceneIndex, frameIndex, visualStyle) {
+  const moment = frameIndex === 0
+    ? 'Capture the opening visible instant of this narrated beat.'
+    : 'Capture the later visible consequence of this same narrated beat, roughly one to two seconds later.';
+  return [
+    sceneVisualPrompt(scene, sceneIndex, frameIndex, visualStyle),
+    moment,
+    'This is one frame in a moving short, not a poster. Keep the composition compatible with the adjacent motion frame while preserving the literal story action.',
+  ].join(' ');
+}
+
+function buildQualityFallbackPrompt(scene, visualStyle, frameIndex = 0) {
+  const stylePrompt = getVisualStylePreset(visualStyle).prompt;
+  const exactMoment = scene.visualBeats?.[frameIndex] || scene.action;
+  return [
+    stylePrompt,
+    `exact narrated line: "${scene.text}"`,
+    `exact visible moment: ${exactMoment}`,
     `one clear recurring protagonist: ${scene.subject}`,
     `literal physical location: ${scene.setting}`,
-    `visible physical action: ${scene.action}`,
     `camera framing: ${scene.camera}`,
     'vertical 9:16 social-video frame',
-    'the main subject must be clearly recognizable and occupy roughly 35 to 60 percent of the frame',
+    'the frame must visibly prove the narrated event; literal story objects and actions outrank generic character posing',
+    'the main subject must be clearly recognizable and occupy roughly 35 to 60 percent of the frame when the narration centers that subject',
     'show people, objects, architecture, landscape, and physical action literally',
     'do not visualize abstract words or concepts such as aura, rizz, energy, gravity, loop, lore, or side quest as symbols, text, fog, blobs, or typography',
     'if signs, screens, labels, paperwork, or displays are visible, keep their writing blank, tiny, defocused, or unreadable',
@@ -843,7 +857,7 @@ async function requestHordeSceneImage(visualPrompt, seed) {
 }
 
 async function requestSceneImage(scene, sceneIndex, visualStyle, prompt, frameIndex = 0) {
-  const visualPrompt = motionFramePrompt(scene, sceneIndex, frameIndex);
+  const visualPrompt = motionFramePrompt(scene, sceneIndex, frameIndex, visualStyle);
   const sceneSeed = seedFromString(`${prompt}:${sceneIndex}:${frameIndex}:${scene.subject}:${scene.setting}`);
   const continuitySeed = seedFromString(`${prompt}:${scene.subject}:${visualStyle}:recurring-protagonist:${frameIndex}`);
   const failures = [];
@@ -866,14 +880,7 @@ async function requestSceneImage(scene, sceneIndex, visualStyle, prompt, frameIn
     failures.push(String(error?.message || 'Cloudflare unavailable').slice(0, 100));
   }
 
-  // In fallback mode, create four stronger anchor images and reuse them for
-  // neighboring scenes. This preserves continuity and avoids eight low-quality
-  // anonymous generations competing for free capacity.
-  if (sceneIndex % 2 === 1) {
-    throw new Error(`${failures.join(' → ')} → scheduled nearest-anchor reuse`);
-  }
-
-  const fallbackPrompt = buildQualityFallbackPrompt(scene, visualStyle);
+  const fallbackPrompt = buildQualityFallbackPrompt(scene, visualStyle, frameIndex);
 
   for (const model of ['flux', 'zimage']) {
     try {
@@ -907,20 +914,6 @@ function summarizeVisualSources(sources, reusedCount, errors = []) {
   if (parts.length) return parts.join(' · ');
   const reason = errors.find(Boolean);
   return reason ? `cinematic fallback · ${reason}` : 'cinematic fallback';
-}
-
-function nearestImageIndex(results, target) {
-  let best = -1;
-  let distance = Infinity;
-  results.forEach((image, index) => {
-    if (!image) return;
-    const nextDistance = Math.abs(index - target);
-    if (nextDistance < distance) {
-      distance = nextDistance;
-      best = index;
-    }
-  });
-  return best;
 }
 
 async function generateSceneImages(token) {
@@ -996,20 +989,6 @@ async function generateSceneImages(token) {
     }
   }
 
-  const baseFrames = frameResults.map(pair => pair[0] || null);
-  if (baseFrames.some(Boolean)) {
-    for (let sceneIndex = 0; sceneIndex < frameResults.length; sceneIndex += 1) {
-      if (frameResults[sceneIndex][0]) continue;
-      const nearest = nearestImageIndex(baseFrames, sceneIndex);
-      if (nearest >= 0) {
-        const sourcePair = frameResults[nearest];
-        frameResults[sceneIndex][0] = sourcePair[0];
-        frameResults[sceneIndex][1] = sourcePair[1] || sourcePair[0];
-        reusedCount += 2;
-      }
-    }
-  }
-
   state.sceneFrames = frameResults;
   state.sceneImages = frameResults.map(pair => pair[0] || pair[1] || null);
   state.visualGeneratedCount = generatedFrames;
@@ -1024,9 +1003,12 @@ async function generateSceneImages(token) {
 function sceneVideoPrompt(scene, sceneIndex) {
   return [
     'Animate this exact generated brainrot scene as a continuous vertical short-form video clip.',
-    `Scene ${sceneIndex + 1} subject: ${scene.subject}.`,
-    `Visible action: ${scene.action}.`,
+    `Scene ${sceneIndex + 1} exact narrated line: "${scene.text}".`,
+    `Opening visible moment: ${scene.visualBeats?.[0] || scene.action}.`,
+    `Later visible moment: ${scene.visualBeats?.[1] || scene.action}.`,
+    `Recurring subject: ${scene.subject}.`,
     `Camera movement: ${scene.camera}.`,
+    'The clip must visibly perform the literal narrated event; do not replace story-specific objects or actions with generic posing.',
     `Mood: ${scene.mood}.`,
     'Preserve the exact recurring character identity, silhouette, face, materials, signature prop, outfit, environment, and screen direction from the supplied first and last frames.',
     'Use visible character motion, expression changes, environmental movement, and purposeful camera motion. Do not turn this into a static zoom.',
@@ -1523,7 +1505,7 @@ async function generate(promptValue) {
   } else if (readyImages === targetFrames) {
     setStatus('Ready. Video generation was unavailable, so 16 motion frames drive the 32 linked shots plus synchronized narration.', 'warn');
   } else if (readyImages > 0 && state.visualCoveredCount === scenes.length) {
-    setStatus(`Ready. Video generation was unavailable; ${readyImages}/16 visual frames generated and missing moments reuse the nearest generated imagery.`, 'warn');
+    setStatus(`Ready. Video generation was unavailable; ${readyImages}/16 story-grounded visual frames generated and missing scenes use the cinematic fallback.`, 'warn');
   } else if (readyImages > 0) {
     setStatus(`Ready. Video generation was unavailable; ${readyImages}/16 visual frames are live and remaining beats use the cinematic fallback.`, 'warn');
   } else {
@@ -1946,8 +1928,7 @@ function drawLinkedVisual(scene, sceneIndex, microShot, microProgress, sceneProg
 
   const sourceImageIndex = microShot?.sourceImageIndex ?? sceneIndex;
   const pair = state.sceneFrames[sourceImageIndex] || [];
-  const nearest = nearestImageIndex(state.sceneImages, sourceImageIndex);
-  const fallbackImage = state.sceneImages[sourceImageIndex] || (nearest >= 0 ? state.sceneImages[nearest] : null);
+  const fallbackImage = state.sceneImages[sourceImageIndex] || null;
   const firstImage = pair[0] || fallbackImage;
   const secondImage = pair[1] || firstImage;
 
