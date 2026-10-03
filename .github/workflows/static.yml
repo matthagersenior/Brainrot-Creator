@@ -220,7 +220,7 @@ jobs:
             -H 'content-type: application/json' \
             --data '{"prompt":"frog at the DMV","visualStyle":"cursed-real"}')"
           if [[ "$story_status" == "200" ]]; then
-            jq -e '(.source | startswith("gemini-")) and (.visualStyle == "cursed-real") and (.scenes | length == 8)' "$RUNNER_TEMP/story.json" >/dev/null
+            jq -e '(.source | startswith("gemini-")) and (.visualStyle == "cursed-real") and (.scenes | length == 8) and ([.scenes[].visualBeats | length == 2] | all)' "$RUNNER_TEMP/story.json" >/dev/null
             echo "Gemini story endpoint passed."
           elif [[ "$story_status" == "502" ]] \
             && jq -e '(.detail // "") | test("high demand|UNAVAILABLE|RESOURCE_EXHAUSTED|rate limit|temporar"; "i")' "$RUNNER_TEMP/story.json" >/dev/null; then
