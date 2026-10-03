@@ -53,12 +53,13 @@ test('PWA icon files exist as valid PNG assets at the declared sizes', async () 
   assert.equal(icon512.readUInt32BE(20), 512);
 });
 
-test('polished app shell exposes install affordance and automatic voice-cast status', async () => {
+test('polished app shell keeps installation obvious without exposing implementation details', async () => {
   const html = await readFile(new URL('index.html', root), 'utf8');
   const css = await readFile(new URL('styles.css', root), 'utf8');
 
   assert.match(html, /INSTALL APP/);
-  assert.match(html, /AUTO VOICE CAST/);
+  assert.match(html, /id="installHint"[^>]*hidden/);
+  assert.doesNotMatch(html, /AUTO VOICE CAST|AI SHORT CREATOR/);
   assert.match(html, /id="wordMeter"[^>]*>0 \/ 60 words<\/span>/);
   assert.match(css, /\.app-utility/);
   assert.match(css, /\.install-btn/);
