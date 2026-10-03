@@ -710,3 +710,104 @@ body::before {
   max-width: 100%;
   overflow-wrap: anywhere;
 }
+
+
+.chaos-mission {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 3;
+  max-width: min(68%, 320px);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgba(198,255,0,.28);
+  border-radius: 999px;
+  padding: 7px 9px;
+  background: rgba(5,7,11,.78);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 30px rgba(0,0,0,.28);
+  pointer-events: none;
+}
+.chaos-mission span {
+  color: var(--lime);
+  font-size: 9px;
+  font-weight: 950;
+  letter-spacing: .1em;
+}
+.chaos-mission strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #fff;
+  font-size: 10px;
+  letter-spacing: .04em;
+}
+.chaos-mission b {
+  color: var(--cyan);
+  font-size: 10px;
+}
+
+body.watch-mode {
+  overflow: hidden;
+  background: #000;
+}
+body.watch-mode .app-utility,
+body.watch-mode .install-hint,
+body.watch-mode .result-header,
+body.watch-mode .result-controls,
+body.watch-mode .result-sources,
+body.watch-mode .result-note,
+body.watch-mode .flow-footer {
+  display: none !important;
+}
+body.watch-mode .app-shell,
+body.watch-mode .flow-shell {
+  width: 100%;
+  max-width: none;
+  height: 100dvh;
+  padding: 0;
+  margin: 0;
+}
+body.watch-mode .result-view {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  width: 100vw;
+  min-height: 100dvh;
+  height: 100dvh;
+  background: #000;
+  display: grid;
+  place-items: center;
+}
+body.watch-mode .result-shell {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  gap: 0;
+}
+body.watch-mode .result-stage-shell {
+  width: min(100vw, calc(100dvh * 9 / 16));
+  height: min(100dvh, calc(100vw * 16 / 9));
+  max-width: none;
+  margin: 0;
+}
+body.watch-mode #videoCanvas {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: #000;
+  touch-action: manipulation;
+}
+
+@media (max-width: 420px) {
+  .chaos-mission {
+    max-width: calc(100% - 86px);
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+}
