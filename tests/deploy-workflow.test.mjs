@@ -70,3 +70,10 @@ test('production alias readiness waits for the real-video app bundle, not only g
   assert.match(readiness, /requestPuterSceneVideo/);
   assert.match(readiness, /sceneVideos/);
 });
+
+
+test('production smoke requires two visual beats for every generated story scene', async () => {
+  const workflow = await workflowText();
+  assert.match(workflow, /visualBeats/);
+  assert.match(workflow, /length == 2/);
+});
