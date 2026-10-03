@@ -146,10 +146,14 @@ jobs:
           alias_ready=false
           for attempt in {1..30}; do
             if curl --fail --silent --show-error "$base/" > "$RUNNER_TEMP/page.html" \
+              && curl --fail --silent --show-error "$base/app.mjs" > "$RUNNER_TEMP/app.mjs" \
               && grep -q 'ROT MACHINE' "$RUNNER_TEMP/page.html" \
               && grep -q 'visualStyleSelect' "$RUNNER_TEMP/page.html" \
               && grep -q 'chaosCanvas' "$RUNNER_TEMP/page.html" \
-              && grep -q 'installBtn' "$RUNNER_TEMP/page.html"; then
+              && grep -q 'installBtn' "$RUNNER_TEMP/page.html" \
+              && grep -q 'txt2vid' "$RUNNER_TEMP/app.mjs" \
+              && grep -q 'requestPuterSceneVideo' "$RUNNER_TEMP/app.mjs" \
+              && grep -q 'sceneVideos' "$RUNNER_TEMP/app.mjs"; then
               alias_ready=true
               echo "Cloudflare production alias is current on attempt $attempt."
               break
