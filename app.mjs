@@ -19,6 +19,8 @@ import {
   getVisualStylePreset,
 } from './app-core.mjs';
 
+const VISUAL_FRAMES_PER_SCENE = 2;
+
 const FALLBACK_TRENDS = [
   'Nintendo', 'Minecraft', 'Roblox', 'Fortnite', 'viral dance challenge', 'anime opening',
   'streamer speedrun', 'mystery mascot', 'football celebration', 'movie trailer reaction', 'AI pet', 'retro game remake',
@@ -115,6 +117,7 @@ const state = {
   visualErrors: [],
   visualStyle: 'cursed-real',
   sceneImages: [],
+  sceneFrames: [],
   audioBuffer: null,
   audioContext: null,
   audioSource: null,
@@ -647,6 +650,17 @@ function sceneVisualPrompt(scene, sceneIndex) {
   ].join(' ');
 }
 
+function motionFramePrompt(scene, sceneIndex, frameIndex) {
+  const moment = frameIndex === 0
+    ? 'Capture the opening motion moment of this beat with a strong readable pose and clear direction of movement.'
+    : 'Capture the same exact recurring character roughly one to two seconds later in the same beat: preserve face, body design, materials, signature prop, outfit, environment, and screen direction while visibly advancing the physical action, expression, and pose.';
+  return [
+    sceneVisualPrompt(scene, sceneIndex),
+    moment,
+    'This is one frame in a moving short, not a poster. Keep the composition compatible with the adjacent motion frame so a cross-dissolve and camera move feels like continuous video.',
+  ].join(' ');
+}
+
 function buildQualityFallbackPrompt(scene, visualStyle) {
   const stylePrompt = getVisualStylePreset(visualStyle).prompt;
   return [
@@ -816,10 +830,10 @@ async function requestHordeSceneImage(visualPrompt, seed) {
   };
 }
 
-async function requestSceneImage(scene, sceneIndex, visualStyle, prompt) {
-  const visualPrompt = sceneVisualPrompt(scene, sceneIndex);
-  const sceneSeed = seedFromString(`${prompt}:${sceneIndex}:${scene.subject}:${scene.setting}`);
-  const continuitySeed = seedFromString(`${prompt}:${scene.subject}:${visualStyle}:recurring-protagonist`);
+async function requestSceneImage(scene, sceneIndex, visualStyle, prompt, frameIndex = 0) {
+  const visualPrompt = motionFramePrompt(scene, sceneIndex, frameIndex);
+  const sceneSeed = seedFromString(`${prompt}:${sceneIndex}:${frameIndex}:${scene.subject}:${scene.setting}`);
+  const continuitySeed = seedFromString(`${prompt}:${scene.subject}:${visualStyle}:recurring-protagonist:${frameIndex}`);
   const failures = [];
 
   try {
@@ -900,68 +914,98 @@ function nearestImageIndex(results, target) {
 async function generateSceneImages(token) {
   if (!state.story) return 0;
   const scenes = state.story.scenes;
-  const results = Array(scenes.length).fill(null);
-  const sources = Array(scenes.length).fill('');
-  const errors = Array(scenes.length).fill('');
+  const frameResults = scenes.map(() => Array(VISUAL_FRAMES_PER_SCENE).fill(null));
+  const frameSources = scenes.map(() => Array(VISUAL_FRAMES_PER_SCENE).fill(''));
+  const frameErrors = scenes.map(() => Array(VISUAL_FRAMES_PER_SCENE).fill(''));
+  const slots = scenes.flatMap((scene, sceneIndex) => (
+    Array.from({ length: VISUAL_FRAMES_PER_SCENE }, (_, frameIndex) => ({ scene, sceneIndex, frameIndex }))
+  ));
   let cursor = 0;
   let completed = 0;
 
   async function worker() {
-    while (cursor < scenes.length) {
-      const index = cursor;
+    while (cursor < slots.length) {
+      const slot = slots[cursor];
       cursor += 1;
+      const { scene, sceneIndex, frameIndex } = slot;
       try {
-        const result = await requestSceneImage(scenes[index], index, state.visualStyle, state.story.prompt);
+        const result = await requestSceneImage(
+          scene,
+          sceneIndex,
+          state.visualStyle,
+          state.story.prompt,
+          frameIndex,
+        );
         if (token !== state.generateToken) return;
-        results[index] = result.image;
-        sources[index] = result.source;
+        frameResults[sceneIndex][frameIndex] = result.image;
+        frameSources[sceneIndex][frameIndex] = result.source;
       } catch (error) {
-        results[index] = null;
-        errors[index] = String(error?.message || error || 'image fallback failed').slice(0, 220);
+        frameResults[sceneIndex][frameIndex] = null;
+        frameErrors[sceneIndex][frameIndex] = String(error?.message || error || 'image fallback failed').slice(0, 220);
       }
+
       completed += 1;
       if (token === state.generateToken) {
-        const ready = results.filter(Boolean).length;
-        state.sceneImages = [...results];
-        state.visualGeneratedCount = ready;
-        state.visualCoveredCount = ready;
-        state.visualErrors = [...errors];
-        state.visualSource = ready
-          ? summarizeVisualSources(sources, 0, errors)
-          : completed < scenes.length
+        const readyFrames = frameResults.flat().filter(Boolean).length;
+        state.sceneFrames = frameResults.map(pair => [...pair]);
+        state.sceneImages = frameResults.map(pair => pair[0] || pair[1] || null);
+        state.visualGeneratedCount = readyFrames;
+        state.visualCoveredCount = state.sceneImages.filter(Boolean).length;
+        state.visualErrors = frameErrors.flat().filter(Boolean);
+        const flattenedSources = frameSources.flat();
+        state.visualSource = readyFrames
+          ? summarizeVisualSources(flattenedSources, 0, state.visualErrors)
+          : completed < slots.length
             ? 'trying quality image fallback…'
-            : summarizeVisualSources(sources, 0, errors);
-        updateLoadingGallery(results, completed, scenes.length);
+            : summarizeVisualSources(flattenedSources, 0, state.visualErrors);
+        updateLoadingGallery(frameResults.flat(), completed, slots.length);
         setSources();
         drawFrame(0);
-        setStatus(`Visualizing story scenes… ${completed}/${scenes.length}`, 'busy');
+        setStatus(`Generating motion frames… ${completed}/${slots.length}`, 'busy');
       }
     }
   }
 
-  await Promise.all([worker(), worker()]);
+  await Promise.all([worker(), worker(), worker()]);
   if (token !== state.generateToken) return 0;
 
-  const generated = results.filter(Boolean).length;
+  const generatedFrames = frameResults.flat().filter(Boolean).length;
   let reusedCount = 0;
-  if (generated > 0) {
-    for (let index = 0; index < results.length; index += 1) {
-      if (results[index]) continue;
-      const nearest = nearestImageIndex(results, index);
+
+  for (let sceneIndex = 0; sceneIndex < frameResults.length; sceneIndex += 1) {
+    const pair = frameResults[sceneIndex];
+    if (!pair[0] && pair[1]) {
+      pair[0] = pair[1];
+      reusedCount += 1;
+    }
+    if (!pair[1] && pair[0]) {
+      pair[1] = pair[0];
+      reusedCount += 1;
+    }
+  }
+
+  const baseFrames = frameResults.map(pair => pair[0] || null);
+  if (baseFrames.some(Boolean)) {
+    for (let sceneIndex = 0; sceneIndex < frameResults.length; sceneIndex += 1) {
+      if (frameResults[sceneIndex][0]) continue;
+      const nearest = nearestImageIndex(baseFrames, sceneIndex);
       if (nearest >= 0) {
-        results[index] = results[nearest];
-        reusedCount += 1;
+        const sourcePair = frameResults[nearest];
+        frameResults[sceneIndex][0] = sourcePair[0];
+        frameResults[sceneIndex][1] = sourcePair[1] || sourcePair[0];
+        reusedCount += 2;
       }
     }
   }
 
-  state.sceneImages = results;
-  state.visualGeneratedCount = generated;
-  state.visualCoveredCount = results.filter(Boolean).length;
-  state.visualErrors = [...errors];
-  state.visualSource = summarizeVisualSources(sources, reusedCount, errors);
+  state.sceneFrames = frameResults;
+  state.sceneImages = frameResults.map(pair => pair[0] || pair[1] || null);
+  state.visualGeneratedCount = generatedFrames;
+  state.visualCoveredCount = state.sceneImages.filter(Boolean).length;
+  state.visualErrors = frameErrors.flat().filter(Boolean);
+  state.visualSource = summarizeVisualSources(frameSources.flat(), reusedCount, state.visualErrors);
   setSources();
-  return generated;
+  return generatedFrames;
 }
 
 function ensureAudioContext() {
@@ -1127,6 +1171,7 @@ async function generate(promptValue) {
   state.timeline = [];
   state.microTimeline = [];
   state.sceneImages = [];
+  state.sceneFrames = [];
   state.visualStyle = visualStyle;
   state.storySource = 'local fallback';
   state.voiceSource = 'AI voice pending';
@@ -1200,14 +1245,15 @@ async function generate(promptValue) {
   stopCookingChaos();
   setView('result');
   updatePlaybackControls();
-  if (readyImages === scenes.length) {
-    setStatus('Ready. Eight fresh AI keyframes drive 32 linked motion shots plus narration.', 'ok');
+  const targetFrames = scenes.length * VISUAL_FRAMES_PER_SCENE;
+  if (readyImages === targetFrames) {
+    setStatus('Ready. 16 motion frames drive the 32 linked shots plus synchronized narration.', 'ok');
   } else if (readyImages > 0 && state.visualCoveredCount === scenes.length) {
-    setStatus(`Ready. ${readyImages}/8 fresh AI keyframes generated; missing beats reuse the nearest generated imagery so all 32 shots stay visual.`, 'ok');
+    setStatus(`Ready. ${readyImages}/16 visual frames generated; missing motion moments reuse their nearest anchor so the full short keeps moving.`, 'ok');
   } else if (readyImages > 0) {
-    setStatus(`Ready. ${readyImages}/8 fresh AI keyframes are live; remaining shots use the cinematic fallback.`, 'warn');
+    setStatus(`Ready. ${readyImages}/16 visual frames are live; remaining beats use the cinematic motion fallback.`, 'warn');
   } else {
-    setStatus('Ready. All image providers were unavailable, so the cinematic fallback is carrying the 32 shots.', 'warn');
+    setStatus('Ready. Image providers were unavailable, so the cinematic animated fallback is carrying the short.', 'warn');
   }
 }
 
@@ -1523,6 +1569,45 @@ function drawImageCover(image, motion, progress) {
   ctx.restore();
 }
 
+function drawMotionPair(firstImage, secondImage, motion, sceneProgress) {
+  if (!firstImage && !secondImage) return false;
+  const first = firstImage || secondImage;
+  const second = secondImage || firstImage;
+  if (!first || !second) return false;
+
+  const t = easeMotion(Math.max(0, Math.min(1, Number(sceneProgress) || 0)));
+  const handoff = Math.max(0, Math.min(1, (t - 0.18) / 0.64));
+  const firstMotion = {
+    ...motion,
+    zoomEnd: Math.max(motion.zoomEnd || 1, (motion.zoomStart || 1) + 0.055),
+    panXEnd: (motion.panXEnd || 0) + 10,
+    panYEnd: (motion.panYEnd || 0) - 5,
+  };
+  const secondMotion = {
+    ...motion,
+    zoomStart: Math.max(1.025, (motion.zoomStart || 1) + 0.02),
+    zoomEnd: Math.max(1.07, (motion.zoomEnd || 1) + 0.055),
+    panXStart: (motion.panXStart || 0) - 8,
+    panXEnd: (motion.panXEnd || 0) + 6,
+    panYStart: (motion.panYStart || 0) + 5,
+    panYEnd: (motion.panYEnd || 0) - 6,
+  };
+
+  ctx.save();
+  ctx.globalAlpha = 1 - handoff;
+  drawImageCover(first, firstMotion, Math.min(1, t * 1.15));
+  ctx.restore();
+
+  if (handoff > 0.001) {
+    ctx.save();
+    ctx.globalAlpha = handoff;
+    drawImageCover(second, secondMotion, Math.max(0, (t - 0.18) / 0.82));
+    ctx.restore();
+  }
+  return true;
+}
+
+
 function drawSceneTransition(previousImage, previousMotion, image, motion, progress, sceneIndex) {
   const t = easeMotion(Math.max(0, Math.min(1, progress)));
   const mode = sceneIndex % 3;
@@ -1575,18 +1660,25 @@ function drawSceneTransition(previousImage, previousMotion, image, motion, progr
 
 function drawLinkedVisual(scene, sceneIndex, microShot, microProgress, sceneProgress) {
   const sourceImageIndex = microShot?.sourceImageIndex ?? sceneIndex;
+  const pair = state.sceneFrames[sourceImageIndex] || [];
   const nearest = nearestImageIndex(state.sceneImages, sourceImageIndex);
-  const image = state.sceneImages[sourceImageIndex] || (nearest >= 0 ? state.sceneImages[nearest] : null);
-  if (!image || !microShot?.motion) {
+  const fallbackImage = state.sceneImages[sourceImageIndex] || (nearest >= 0 ? state.sceneImages[nearest] : null);
+  const firstImage = pair[0] || fallbackImage;
+  const secondImage = pair[1] || firstImage;
+
+  if (!firstImage || !microShot?.motion) {
     drawCinematicFallback(scene, sceneIndex, microShot ? microProgress : sceneProgress);
     return;
   }
 
   const transitionFromSceneIndex = microShot.transitionFromSceneIndex;
-  const previousImage = Number.isInteger(transitionFromSceneIndex)
-    ? state.sceneImages[transitionFromSceneIndex]
-    : null;
-  const transitionWindow = 0.42;
+  const previousPair = Number.isInteger(transitionFromSceneIndex)
+    ? (state.sceneFrames[transitionFromSceneIndex] || [])
+    : [];
+  const previousImage = previousPair[1]
+    || previousPair[0]
+    || (Number.isInteger(transitionFromSceneIndex) ? state.sceneImages[transitionFromSceneIndex] : null);
+  const transitionWindow = 0.34;
 
   if (previousImage && microProgress < transitionWindow) {
     const previousShot = state.microTimeline
@@ -1595,7 +1687,7 @@ function drawLinkedVisual(scene, sceneIndex, microShot, microProgress, sceneProg
     drawSceneTransition(
       previousImage,
       previousShot?.motion || microShot.motion,
-      image,
+      firstImage,
       microShot.motion,
       microProgress / transitionWindow,
       sceneIndex,
@@ -1603,7 +1695,9 @@ function drawLinkedVisual(scene, sceneIndex, microShot, microProgress, sceneProg
     return;
   }
 
-  drawImageCover(image, microShot.motion, microProgress);
+  if (!drawMotionPair(firstImage, secondImage, microShot.motion, sceneProgress)) {
+    drawImageCover(firstImage, microShot.motion, microProgress);
+  }
 }
 
 function drawCinematicFallback(scene, sceneIndex, progress) {
