@@ -177,3 +177,18 @@ test('rendered video keeps scene and shot metadata off the image', async () => {
   assert.doesNotMatch(drawFrame, /scene\.burst/);
   assert.doesNotMatch(drawFrame, /s \/ 60s/);
 });
+
+
+test('playback enters distraction-free watch mode and removes the corner canvas badge', async () => {
+  const html = await readFile(new URL('index.html', root), 'utf8');
+  const app = await readFile(new URL('app.mjs', root), 'utf8');
+  const css = await readFile(new URL('styles.css', root), 'utf8');
+
+  assert.doesNotMatch(html, /canvas-badge/);
+  assert.match(app, /watch-mode/);
+  assert.match(app, /videoCanvas.*addEventListener|canvas\.addEventListener/);
+  assert.match(css, /body\.watch-mode/);
+  assert.match(css, /position:\s*fixed/);
+  assert.match(css, /100dvh/);
+  assert.match(css, /\.watch-mode[\s\S]*\.result-controls[\s\S]*display:\s*none/);
+});
