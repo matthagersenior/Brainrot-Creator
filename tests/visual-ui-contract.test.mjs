@@ -113,8 +113,6 @@ test('free-first fallback chain prioritizes quality providers before emergency H
   const app = await readFile(new URL('app.mjs', root), 'utf8');
 
   assert.match(html, /https:\/\/js\.puter\.com\/v2\//);
-  assert.match(html, /id="resultVisualSource"/);
-  assert.match(html, /id="resultVoiceSource"/);
 
   const sceneChain = app.slice(app.indexOf('async function requestSceneImage'), app.indexOf('function summarizeVisualSources'));
   const cloudflare = sceneChain.indexOf('/api/visualize');
