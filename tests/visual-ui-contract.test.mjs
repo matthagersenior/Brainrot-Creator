@@ -220,3 +220,30 @@ test('default generated visuals use a recognizable contemporary brainrot meme la
   assert.doesNotMatch(story, /avoid[^\n]*mascot/i);
   assert.match(visual, /short-form meme|brainrot/i);
 });
+
+
+test('video-first pipeline generates real scene clips and falls back to motion frames per scene', async () => {
+  const app = await readFile(new URL('app.mjs', root), 'utf8');
+
+  assert.match(app, /puter\.ai\.txt2vid/);
+  assert.match(app, /sceneVideos/);
+  assert.match(app, /requestPuterSceneVideo/);
+  assert.match(app, /generateSceneVideos/);
+  assert.match(app, /seedance-2-0-mini/);
+  assert.match(app, /input_reference/);
+  assert.match(app, /last_frame/);
+  assert.match(app, /generate_audio:\s*false/);
+  assert.match(app, /drawSceneVideo/);
+  assert.match(app, /pauseSceneVideos/);
+  assert.match(app, /video[^\n]*fallback|motion-frame fallback/i);
+});
+
+test('real scene video stays compatible with the existing narrated canvas export', async () => {
+  const app = await readFile(new URL('app.mjs', root), 'utf8');
+
+  const drawFrame = app.slice(app.indexOf('function drawFrame'), app.indexOf('function drawWelcome'));
+  assert.match(drawFrame, /drawLinkedVisual/);
+  assert.match(app, /canvas\.captureStream/);
+  assert.match(app, /syncSceneVideo/);
+  assert.match(app, /video\.playbackRate/);
+});
