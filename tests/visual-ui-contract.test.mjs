@@ -43,7 +43,7 @@ test('creator keeps the multi-shot engine but strips explanatory copy from the v
   assert.doesNotMatch(html, /FREE MULTI-SHOT FORMAT|A richer prompt in|Describe the idea, characters, setting/i);
   assert.match(css, /\.creator-hidden-metrics/);
   assert.match(css, /min-height:\s*clamp\(190px,\s*30svh,\s*310px\)/);
-  assert.match(app, /Continue the immediately previous story beat/);
+  assert.match(app, /Preserve the recurring protagonist identity/);
   assert.match(app, /sceneCountEl\.textContent = state\.microTimeline\.length/);
 });
 
