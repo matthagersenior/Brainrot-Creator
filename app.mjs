@@ -90,8 +90,6 @@ const storySourceEl = document.getElementById('storySource');
 const voiceSourceEl = document.getElementById('voiceSource');
 const visualSourceEl = document.getElementById('visualSource');
 const trendSourcePill = document.getElementById('trendSourcePill');
-const resultVisualSourceEl = document.getElementById('resultVisualSource');
-const resultVoiceSourceEl = document.getElementById('resultVoiceSource');
 const createView = document.getElementById('createView');
 const cookingView = document.getElementById('cookingView');
 const resultView = document.getElementById('resultView');
@@ -112,7 +110,6 @@ const repeatBtn = document.getElementById('repeatBtn');
 const nextTrendBtn = document.getElementById('nextTrendBtn');
 const homeBtn = document.getElementById('homeBtn');
 const downloadBtn = document.getElementById('downloadBtn');
-const downloadNote = document.getElementById('downloadNote');
 const scriptWordsEl = document.getElementById('scriptWords');
 const sceneCountEl = document.getElementById('sceneCount');
 const videoLengthEl = document.getElementById('videoLength');
@@ -565,8 +562,6 @@ function setSources() {
   voiceSourceEl.textContent = state.voiceSource;
   visualSourceEl.textContent = state.visualSource;
   trendSourcePill.textContent = state.trendSource;
-  if (resultVisualSourceEl) resultVisualSourceEl.textContent = state.visualSource;
-  if (resultVoiceSourceEl) resultVoiceSourceEl.textContent = state.voiceSource;
 }
 
 function setGenerating(busy) {
@@ -1417,13 +1412,6 @@ function updatePlaybackControls() {
   homeBtn.disabled = state.recording;
   downloadBtn.disabled = !ready || state.playing || state.paused || !canRecordNarratedVideo();
   playPauseBtn.textContent = state.paused ? '▶ RESUME' : state.playing ? '❚❚ PAUSE' : '▶ PLAY';
-  if (canRecordNarratedVideo()) {
-    downloadNote.textContent = 'Download records the full 60-second 720×1280 canvas + AI narration as WebM on this device.';
-  } else if (ready) {
-    downloadNote.textContent = 'Preview works now. Narrated video export requires Gemini TTS plus browser MediaRecorder support.';
-  } else {
-    downloadNote.textContent = 'Your full-resolution canvas stays export quality while the preview scales to fit this screen.';
-  }
 }
 
 async function generate(promptValue) {

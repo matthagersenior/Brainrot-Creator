@@ -113,8 +113,6 @@ test('free-first fallback chain prioritizes quality providers before emergency H
   const app = await readFile(new URL('app.mjs', root), 'utf8');
 
   assert.match(html, /https:\/\/js\.puter\.com\/v2\//);
-  assert.match(html, /id="resultVisualSource"/);
-  assert.match(html, /id="resultVoiceSource"/);
 
   const sceneChain = app.slice(app.indexOf('async function requestSceneImage'), app.indexOf('function summarizeVisualSources'));
   const cloudflare = sceneChain.indexOf('/api/visualize');
@@ -246,4 +244,13 @@ test('real scene video stays compatible with the existing narrated canvas export
   assert.match(app, /canvas\.captureStream/);
   assert.match(app, /syncSceneVideo/);
   assert.match(app, /video\.playbackRate/);
+});
+
+
+test('result screen shows the rot and actions without exposing implementation details', async () => {
+  const html = await readFile(new URL('index.html', root), 'utf8');
+  const resultMarkup = html.slice(html.indexOf('id="resultView"'), html.indexOf('<footer', html.indexOf('id="resultView"')));
+
+  assert.doesNotMatch(resultMarkup, /resultVisualSource|resultVoiceSource|downloadNote/);
+  assert.doesNotMatch(resultMarkup, /Visuals:|Voice:|Cloudflare|Gemini|motion-frame|720×1280|WebM/i);
 });

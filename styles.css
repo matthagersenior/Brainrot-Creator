@@ -701,17 +701,6 @@ body::before {
   .install-hint { width: calc(100% - 22px); text-align: center; }
 }
 
-.result-sources {
-  width: min(100%, 480px);
-  margin: 10px auto 0;
-  justify-content: center;
-}
-.result-sources .source-pill {
-  max-width: 100%;
-  overflow-wrap: anywhere;
-}
-
-
 .chaos-mission {
   position: absolute;
   top: 12px;
