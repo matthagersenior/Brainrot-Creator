@@ -77,7 +77,6 @@ const ctx = canvas.getContext('2d');
 const promptInput = document.getElementById('promptInput');
 const wordMeter = document.getElementById('wordMeter');
 const trendRail = document.getElementById('trendRail');
-const trendSource = document.getElementById('trendSource');
 const chaosSelect = document.getElementById('chaosSelect');
 const visualStyleSelect = document.getElementById('visualStyleSelect');
 const installBtn = document.getElementById('installBtn');
@@ -189,11 +188,9 @@ function refreshInstallUi(message = '') {
     return;
   }
   installBtn.hidden = false;
-  installHint.hidden = false;
   installBtn.textContent = deferredInstallPrompt ? 'INSTALL APP' : 'ADD TO DEVICE';
-  installHint.textContent = message || (deferredInstallPrompt
-    ? 'ROT MACHINE is ready to install as a standalone app.'
-    : 'Use this button for install guidance, or your browser’s Install app / Add to Home Screen command.');
+  installHint.hidden = !message;
+  installHint.textContent = message || '';
 }
 
 async function installApp() {
@@ -207,34 +204,31 @@ async function installApp() {
     deferredInstallPrompt = null;
     await prompt.prompt();
     const choice = await prompt.userChoice.catch(() => null);
-    refreshInstallUi(choice?.outcome === 'accepted'
-      ? 'Install accepted. ROT MACHINE will appear with your apps.'
-      : 'Install dismissed. You can install later from the browser menu.');
+    refreshInstallUi();
     return;
   }
 
   const isiOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
   refreshInstallUi(isiOS
-    ? 'On iPhone/iPad: tap Share, then Add to Home Screen.'
-    : 'Open your browser menu and choose Install app or Add to Home Screen.');
+    ? 'Tap Share → Add to Home Screen.'
+    : 'Open the browser menu → Install app.');
 }
 
 window.addEventListener('beforeinstallprompt', event => {
   event.preventDefault();
   deferredInstallPrompt = event;
-  refreshInstallUi('ROT MACHINE is ready to install as a standalone app.');
+  refreshInstallUi();
 });
 
 window.addEventListener('appinstalled', () => {
   deferredInstallPrompt = null;
-  refreshInstallUi('Installed. Launch ROT MACHINE from your app screen.');
+  installBtn.hidden = true;
+  installHint.hidden = true;
 });
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('./sw.js').catch(() => {
-      refreshInstallUi('The app is online, but offline install support could not start in this browser.');
-    });
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
   }, { once: true });
 }
 
@@ -594,7 +588,6 @@ function renderTrendChips() {
     });
     trendRail.appendChild(button);
   });
-  trendSource.textContent = state.trendSource;
   setSources();
 }
 
