@@ -193,3 +193,17 @@ test('playback enters distraction-free watch mode and removes the corner canvas 
   assert.match(css, /100dvh/);
   assert.match(css, /\.watch-mode[\s\S]*\.result-controls[\s\S]*display:\s*none/);
 });
+
+
+test('video-first visuals animate between two generated anchors per scene without losing the existing motion fallback', async () => {
+  const app = await readFile(new URL('app.mjs', root), 'utf8');
+
+  assert.match(app, /VISUAL_FRAMES_PER_SCENE\s*=\s*2/);
+  assert.match(app, /sceneFrames/);
+  assert.match(app, /frameIndex/);
+  assert.match(app, /motionFramePrompt/);
+  assert.match(app, /drawMotionPair/);
+  assert.match(app, /sceneProgress/);
+  assert.match(app, /16 motion frames|16 visual frames/i);
+  assert.match(app, /state\.sceneImages/);
+});
