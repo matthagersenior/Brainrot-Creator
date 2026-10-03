@@ -96,6 +96,37 @@ function parseJsonText(raw) {
   }
 }
 
+function splitNarrationForVisuals(text) {
+  const words = safeText(text, 360).split(/\s+/).filter(Boolean);
+  if (!words.length) return ['', ''];
+  const midpoint = Math.max(1, Math.ceil(words.length / 2));
+  return [
+    words.slice(0, midpoint).join(' '),
+    words.slice(midpoint).join(' ') || words.slice(0, midpoint).join(' '),
+  ];
+}
+
+function repairVisualBeats(scene) {
+  const provided = Array.isArray(scene?.visualBeats)
+    ? scene.visualBeats.map(item => safeText(item, 320)).filter(Boolean).slice(0, 2)
+    : [];
+  if (provided.length === 2) return provided;
+
+  const [openingNarration, laterNarration] = splitNarrationForVisuals(scene?.text);
+  const action = safeText(scene?.action, 260) || 'the narrated physical action happens visibly';
+  return [
+    provided[0] || `Opening visible moment matching "${openingNarration}": ${action}`,
+    provided[1] || `Later visible moment matching "${laterNarration}": show the physical consequence or continuation of ${action}`,
+  ];
+}
+
+function repairStoryScenes(scenes) {
+  return scenes.map(scene => ({
+    ...scene,
+    visualBeats: repairVisualBeats(scene),
+  }));
+}
+
 function parseStoryCandidate(result) {
   const raw = result?.candidates?.[0]?.content?.parts?.find(part => typeof part?.text === 'string')?.text;
   if (!raw) return { ok: false, error: 'GEMINI_STORY_EMPTY' };
@@ -238,7 +269,7 @@ Rules:
       ? candidate.parsed.continuity
       : {};
     return json({
-      scenes: candidate.parsed.scenes,
+      scenes: repairStoryScenes(candidate.parsed.scenes),
       continuity,
       visualStyle,
       source: model,
