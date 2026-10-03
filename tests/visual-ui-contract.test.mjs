@@ -254,3 +254,11 @@ test('result screen shows the rot and actions without exposing implementation de
   assert.doesNotMatch(resultMarkup, /resultVisualSource|resultVoiceSource|downloadNote/);
   assert.doesNotMatch(resultMarkup, /Visuals:|Voice:|Cloudflare|Gemini|motion-frame|720×1280|WebM/i);
 });
+
+
+test('creator screen does not expose free-first implementation strategy', async () => {
+  const html = await readFile(new URL('index.html', root), 'utf8');
+  const creatorMarkup = html.slice(html.indexOf('id="createView"'), html.indexOf('id="cookingView"'));
+
+  assert.doesNotMatch(creatorMarkup, /\$0-FIRST|FREE[- ]?FIRST|free-badge/i);
+});
