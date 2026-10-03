@@ -176,6 +176,7 @@ test('rendered video keeps scene and shot metadata off the image', async () => {
   assert.doesNotMatch(drawFrame, /SHOT\s*\$\{/);
   assert.doesNotMatch(drawFrame, /scene\.burst/);
   assert.doesNotMatch(drawFrame, /s \/ 60s/);
+  assert.doesNotMatch(drawFrame, /totalProgress|progressGradient/);
 });
 
 
