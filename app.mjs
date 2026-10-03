@@ -1747,15 +1747,6 @@ function drawFrame(seconds) {
   if (captionStillSpeaking) drawCaption(words, localWordIndex);
   ctx.restore();
 
-  const totalProgress = Math.max(0, Math.min(1, seconds / TARGET_SECONDS));
-  ctx.fillStyle = 'rgba(0,0,0,.7)';
-  ctx.fillRect(0, 1256, 720, 24);
-  const progressGradient = ctx.createLinearGradient(0, 0, 720, 0);
-  progressGradient.addColorStop(0, '#ff2ec4');
-  progressGradient.addColorStop(.5, '#00e5ff');
-  progressGradient.addColorStop(1, '#c6ff00');
-  ctx.fillStyle = progressGradient;
-  ctx.fillRect(0, 1256, 720 * totalProgress, 24);
 }
 
 function drawWelcome(label = 'READY TO ROT') {
