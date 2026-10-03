@@ -427,6 +427,51 @@ export function timedWordIndex(timings = [], seconds = 0) {
   return Number.isInteger(index) && index >= 0 ? index : null;
 }
 
+export function syncedWordIndex(timings = [], seconds = 0, totalWords = 0, durationSeconds = 0) {
+  const wordCount = Math.max(0, Number.parseInt(totalWords, 10) || 0);
+  if (!wordCount) return null;
+
+  const duration = Math.max(0, Number(durationSeconds) || 0);
+  const time = Math.max(0, Number(seconds) || 0);
+  const anchors = (Array.isArray(timings) ? timings : [])
+    .map(timing => ({
+      start: Number(timing?.start),
+      scriptIndex: Number(timing?.scriptIndex),
+    }))
+    .filter(anchor => Number.isFinite(anchor.start)
+      && Number.isInteger(anchor.scriptIndex)
+      && anchor.scriptIndex >= 0
+      && anchor.scriptIndex < wordCount)
+    .sort((a, b) => a.start - b.start)
+    .filter((anchor, index, list) => index === 0 || anchor.scriptIndex >= list[index - 1].scriptIndex);
+
+  if (!anchors.length || duration <= 0) {
+    return Math.min(wordCount - 1, Math.floor((Math.min(time, Math.max(duration, 1)) / Math.max(duration, 1)) * wordCount));
+  }
+
+  const interpolate = (fromTime, toTime, fromIndex, toIndex) => {
+    if (toTime <= fromTime) return toIndex;
+    const progress = Math.max(0, Math.min(1, (time - fromTime) / (toTime - fromTime)));
+    return Math.max(0, Math.min(wordCount - 1, Math.round(fromIndex + (toIndex - fromIndex) * progress)));
+  };
+
+  const first = anchors[0];
+  if (time <= first.start) {
+    return interpolate(0, Math.max(first.start, 0.001), 0, first.scriptIndex);
+  }
+
+  for (let index = 0; index < anchors.length - 1; index += 1) {
+    const current = anchors[index];
+    const next = anchors[index + 1];
+    if (time <= next.start) {
+      return interpolate(current.start, next.start, current.scriptIndex, next.scriptIndex);
+    }
+  }
+
+  const last = anchors[anchors.length - 1];
+  return interpolate(last.start, Math.max(duration, last.start + 0.001), last.scriptIndex, wordCount - 1);
+}
+
 const CHAOS_MISSIONS = Object.freeze([
   Object.freeze({ type: 'collect', glyph: '🐸', target: 3, label: 'TAP 3 FROGS' }),
   Object.freeze({ type: 'streak', target: 5, label: 'HIT 5 IN A ROW' }),

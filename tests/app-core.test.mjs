@@ -184,3 +184,27 @@ test('loading-game missions turn tapping into small rotating objectives without 
   assert.equal(wrong.progress, 0);
   assert.equal(wrong.complete, false);
 });
+
+
+test('sparse narration timestamps interpolate instead of freezing the first highlighted word', () => {
+  const timings = [
+    { word: 'The', start: 0.10, end: 0.22, scriptIndex: 0 },
+    { word: 'dribbling', start: 3.90, end: 4.20, scriptIndex: 5 },
+  ];
+
+  assert.equal(core.syncedWordIndex(timings, 0.12, 6, 4.4), 0);
+  assert.ok(core.syncedWordIndex(timings, 1.8, 6, 4.4) >= 1);
+  assert.ok(core.syncedWordIndex(timings, 3.2, 6, 4.4) >= 3);
+  assert.equal(core.syncedWordIndex(timings, 4.1, 6, 4.4), 5);
+});
+
+test('caption timing continues through the script when transcription stops early', () => {
+  const timings = [
+    { word: 'The', start: 0.10, end: 0.22, scriptIndex: 0 },
+    { word: 'corn', start: 0.24, end: 0.50, scriptIndex: 1 },
+  ];
+
+  const late = core.syncedWordIndex(timings, 3.5, 6, 4.5);
+  assert.ok(late >= 3);
+  assert.equal(core.syncedWordIndex(timings, 4.5, 6, 4.5), 5);
+});

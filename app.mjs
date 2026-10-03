@@ -12,6 +12,7 @@ import {
   captionWindow,
   pacedWordIndex,
   timedWordIndex,
+  syncedWordIndex,
   createChaosMission,
   advanceChaosMission,
   storyWordCount,
@@ -1780,7 +1781,12 @@ function sceneStateAtTime(seconds) {
 
   if (state.audioBuffer && state.wordTimings.length) {
     const spokenSeconds = seconds * Math.max(0.01, state.narrationPlaybackRate || 1);
-    const globalIndex = timedWordIndex(state.wordTimings, spokenSeconds);
+    const globalIndex = syncedWordIndex(
+      state.wordTimings,
+      spokenSeconds,
+      map.length,
+      Number(state.audioBuffer?.duration) || state.narrationPlaybackSeconds,
+    );
     const mapped = Number.isInteger(globalIndex) ? map[globalIndex] : null;
     if (mapped) {
       words = timeline[mapped.sceneIndex].text.trim().split(/\s+/);
