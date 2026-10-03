@@ -49,17 +49,6 @@ button { -webkit-tap-highlight-color: transparent; }
   color: transparent;
   filter: drop-shadow(0 7px 0 rgba(0,0,0,.42));
 }
-.free-badge {
-  flex: 0 0 auto;
-  border: 1px solid rgba(198,255,0,.5);
-  background: rgba(198,255,0,.1);
-  color: var(--lime);
-  border-radius: 999px;
-  padding: 7px 10px;
-  font-weight: 900;
-  font-size: 11px;
-  letter-spacing: .08em;
-}
 .tagline { margin: 0; color: var(--muted); font-weight: 650; max-width: 70ch; }
 
 .layout { display: grid; grid-template-columns: minmax(300px, 420px) minmax(320px, 1fr); gap: 20px; align-items: start; }
