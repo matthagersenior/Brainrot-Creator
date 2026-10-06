@@ -186,6 +186,20 @@ test('loading-game missions turn tapping into small rotating objectives without 
 });
 
 
+test('loading breaks rotate distinct mini-games and objectives instead of restarting the same challenge', () => {
+  const missions = Array.from({ length: 12 }, (_, index) => core.createChaosMission(index));
+  const gameIds = missions.map(mission => mission.gameId);
+  const labels = missions.map(mission => mission.label);
+
+  assert.ok(new Set(gameIds).size >= 4, 'expected at least four distinct loading-game modes');
+  assert.ok(new Set(labels).size >= 8, 'expected varied objectives across loading breaks');
+  assert.notEqual(gameIds[0], gameIds[1], 'adjacent loading breaks should not start with the same game mode');
+  assert.ok(missions.some(mission => mission.type === 'combo'), 'expected a combo-based game');
+  assert.ok(missions.some(mission => mission.type === 'score'), 'expected a score-based game');
+  assert.ok(missions.some(mission => mission.type === 'precision'), 'expected a precision/avoid-decoy game');
+});
+
+
 test('sparse narration timestamps interpolate instead of freezing the first highlighted word', () => {
   const timings = [
     { word: 'The', start: 0.10, end: 0.22, scriptIndex: 0 },

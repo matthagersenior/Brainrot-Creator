@@ -93,8 +93,11 @@ const trendSourcePill = document.getElementById('trendSourcePill');
 const createView = document.getElementById('createView');
 const cookingView = document.getElementById('cookingView');
 const resultView = document.getElementById('resultView');
+const cookingTitle = document.getElementById('cookingTitle');
 const loadingProgress = document.getElementById('loadingProgress');
+const chaosGameShell = document.getElementById('chaosGameShell');
 const chaosCanvas = document.getElementById('chaosCanvas');
+const chaosTip = document.getElementById('chaosTip');
 const chaosCtx = chaosCanvas?.getContext('2d');
 const chaosScoreEl = document.getElementById('chaosScore');
 const chaosComboEl = document.getElementById('chaosCombo');
@@ -248,6 +251,37 @@ function randomRange(min, max) {
   return min + Math.random() * (max - min);
 }
 
+const CHAOS_GAME_INDEX_STORAGE_KEY = 'brainrot.loading-game-index';
+
+function readStoredChaosMissionIndex() {
+  try {
+    const stored = Number.parseInt(window.localStorage?.getItem(CHAOS_GAME_INDEX_STORAGE_KEY) || '', 10);
+    return Number.isFinite(stored) ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
+function persistChaosMissionIndex(index) {
+  try {
+    window.localStorage?.setItem(CHAOS_GAME_INDEX_STORAGE_KEY, String(index));
+  } catch {
+    // Storage can be unavailable in private or embedded contexts; in-memory rotation still works.
+  }
+}
+
+function nextChaosMissionIndex() {
+  let previous = state.cookingMissionIndex;
+  if (previous < 0) {
+    const stored = readStoredChaosMissionIndex();
+    previous = stored ?? (Math.floor(Math.random() * 12) - 1);
+  }
+  const next = previous + 1;
+  state.cookingMissionIndex = next;
+  persistChaosMissionIndex(next);
+  return next;
+}
+
 function updateChaosHud() {
   if (chaosScoreEl) chaosScoreEl.textContent = String(state.cookingScore);
   if (chaosComboEl) chaosComboEl.textContent = `×${state.cookingCombo}`;
@@ -259,6 +293,15 @@ function updateChaosHud() {
   }
 
   const mission = state.cookingMission;
+  if (cookingTitle && mission?.gameLabel) cookingTitle.textContent = mission.gameLabel;
+  if (chaosTip && mission?.instruction) chaosTip.textContent = mission.instruction;
+  if (chaosGameShell) chaosGameShell.dataset.game = mission?.gameId || '';
+  if (chaosCanvas && mission) {
+    chaosCanvas.setAttribute(
+      'aria-label',
+      `${mission.gameLabel || 'Chaos'} loading mini-game. ${mission.instruction || mission.label || ''}`,
+    );
+  }
   if (chaosMissionEl && mission) {
     chaosMissionEl.textContent = mission.complete ? 'MISSION COMPLETE +250' : mission.label;
   }
@@ -276,8 +319,7 @@ function resetLoadingGallery() {
   state.cookingProgressTarget = 0.04;
   state.cookingProgressDisplay = 0;
   state.cookingReady = false;
-  state.cookingMissionIndex += 1;
-  state.cookingMission = createChaosMission(state.cookingMissionIndex);
+  state.cookingMission = createChaosMission(nextChaosMissionIndex());
   state.cookingMissionCompletedAt = 0;
   if (chaosReady) chaosReady.hidden = true;
   if (loadingProgress) loadingProgress.textContent = 'Preparing your video.';
@@ -288,20 +330,37 @@ function setCookingProgress(value) {
   state.cookingProgressTarget = Math.max(state.cookingProgressTarget, Math.min(1, Number(value) || 0));
 }
 
+function pickChaosObjectSpec() {
+  const mission = state.cookingMission;
+  const preferredGlyphs = mission?.type === 'collect'
+    ? [mission.glyph]
+    : (mission?.type === 'precision' || mission?.type === 'selective' ? mission.glyphs : null);
+
+  if (Array.isArray(preferredGlyphs) && preferredGlyphs.length && Math.random() < .5) {
+    const glyph = preferredGlyphs[Math.floor(Math.random() * preferredGlyphs.length)];
+    const preferred = CHAOS_OBJECTS.find(spec => spec.glyph === glyph);
+    if (preferred) return preferred;
+  }
+  return CHAOS_OBJECTS[Math.floor(Math.random() * CHAOS_OBJECTS.length)];
+}
+
 function spawnChaosObject(now) {
-  if (!chaosCanvas || state.cookingObjects.length >= 15) return;
-  const spec = CHAOS_OBJECTS[Math.floor(Math.random() * CHAOS_OBJECTS.length)];
+  const mission = state.cookingMission || {};
+  const maxObjects = Number(mission.maxObjects) || 15;
+  if (!chaosCanvas || state.cookingObjects.length >= maxObjects) return;
+  const spec = pickChaosObjectSpec();
+  const speedScale = Number(mission.speedScale) || 1;
   const radius = randomRange(34, 55);
   const edge = Math.floor(Math.random() * 4);
   let x = randomRange(radius, chaosCanvas.width - radius);
   let y = randomRange(radius, chaosCanvas.height - radius);
-  let vx = randomRange(-95, 95);
-  let vy = randomRange(-95, 95);
+  let vx = randomRange(-95, 95) * speedScale;
+  let vy = randomRange(-95, 95) * speedScale;
 
-  if (edge === 0) { y = -radius; vy = randomRange(75, 145); }
-  if (edge === 1) { x = chaosCanvas.width + radius; vx = -randomRange(75, 145); }
-  if (edge === 2) { y = chaosCanvas.height + radius; vy = -randomRange(75, 145); }
-  if (edge === 3) { x = -radius; vx = randomRange(75, 145); }
+  if (edge === 0) { y = -radius; vy = randomRange(75, 145) * speedScale; }
+  if (edge === 1) { x = chaosCanvas.width + radius; vx = -randomRange(75, 145) * speedScale; }
+  if (edge === 2) { y = chaosCanvas.height + radius; vy = -randomRange(75, 145) * speedScale; }
+  if (edge === 3) { x = -radius; vx = randomRange(75, 145) * speedScale; }
 
   state.cookingObjects.push({
     ...spec,
@@ -311,11 +370,13 @@ function spawnChaosObject(now) {
     vy,
     radius,
     rotation: randomRange(-Math.PI, Math.PI),
-    spin: randomRange(-1.8, 1.8),
+    spin: randomRange(-1.8, 1.8) * speedScale,
     wobble: randomRange(0, Math.PI * 2),
     color: CHAOS_COLORS[Math.floor(Math.random() * CHAOS_COLORS.length)],
   });
-  state.cookingNextSpawnAt = now + randomRange(300, 620);
+  const spawnMin = Number(mission.spawnMin) || 300;
+  const spawnMax = Number(mission.spawnMax) || 620;
+  state.cookingNextSpawnAt = now + randomRange(spawnMin, spawnMax);
 }
 
 function burstChaos(object, x = object.x, y = object.y) {
@@ -359,13 +420,27 @@ function handleChaosTap(event) {
 
   const [object] = state.cookingObjects.splice(hitIndex, 1);
   const now = performance.now();
-  state.cookingCombo = now - state.cookingLastHitAt < 1050
+  const previousMission = state.cookingMission;
+  const mission = previousMission || {};
+  const comboWindow = Number(mission.comboWindow) || 1050;
+  const isPrecisionMiss = previousMission?.type === 'precision'
+    && Array.isArray(previousMission.glyphs)
+    && !previousMission.glyphs.includes(object.glyph);
+  state.cookingCombo = !isPrecisionMiss && now - state.cookingLastHitAt < comboWindow
     ? Math.min(8, state.cookingCombo + 1)
     : 1;
   state.cookingLastHitAt = now;
-  state.cookingScore += object.points * state.cookingCombo;
-  const previousMission = state.cookingMission;
-  state.cookingMission = advanceChaosMission(previousMission, { glyph: object.glyph, hit: true });
+  if (isPrecisionMiss) {
+    state.cookingScore = Math.max(0, state.cookingScore - 25);
+  } else {
+    state.cookingScore += object.points * state.cookingCombo;
+  }
+  state.cookingMission = advanceChaosMission(previousMission, {
+    glyph: object.glyph,
+    hit: true,
+    combo: state.cookingCombo,
+    score: state.cookingScore,
+  });
   if (state.cookingMission?.complete && !previousMission?.complete) {
     state.cookingScore += 250;
     state.cookingMissionCompletedAt = now;
@@ -448,7 +523,9 @@ function renderCookingChaos(now) {
   state.cookingProgressDisplay += (desired - state.cookingProgressDisplay) * Math.min(1, dt * 2.8);
 
   if (!state.cookingReady && now >= state.cookingNextSpawnAt) spawnChaosObject(now);
-  if (!state.cookingReady && now - state.cookingLastHitAt > 1250 && state.cookingCombo > 1) {
+  const mission = state.cookingMission || {};
+  const comboWindow = Number(mission.comboWindow) || 1250;
+  if (!state.cookingReady && now - state.cookingLastHitAt > comboWindow && state.cookingCombo > 1) {
     state.cookingCombo = Math.max(1, state.cookingCombo - 1);
   }
   if (
@@ -457,8 +534,7 @@ function renderCookingChaos(now) {
     && state.cookingMissionCompletedAt
     && now - state.cookingMissionCompletedAt > 850
   ) {
-    state.cookingMissionIndex += 1;
-    state.cookingMission = createChaosMission(state.cookingMissionIndex);
+    state.cookingMission = createChaosMission(nextChaosMissionIndex());
     state.cookingMissionCompletedAt = 0;
   }
 
