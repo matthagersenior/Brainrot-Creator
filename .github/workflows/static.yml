@@ -62,6 +62,7 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
     steps:
       - name: Check Cloudflare credentials
         id: cloudflare
@@ -116,13 +117,23 @@ jobs:
             echo "::notice::GEMINI_API_KEY is not set yet. Cloudflare will deploy with the app's local/device-voice fallback."
           fi
 
+      - name: Sync Stripe key to Cloudflare
+        if: steps.cloudflare.outputs.ready == 'true'
+        shell: bash
+        run: |
+          if [[ -n "$STRIPE_SECRET_KEY" ]]; then
+            printf '%s' "$STRIPE_SECRET_KEY" | npx --yes wrangler@4 pages secret put STRIPE_SECRET_KEY --project-name="$CLOUDFLARE_PAGES_PROJECT"
+          else
+            echo "::notice::STRIPE_SECRET_KEY is not set yet. Monetization UI will deploy with checkout safely disabled."
+          fi
+
       - name: Prepare static assets
         if: steps.cloudflare.outputs.ready == 'true'
         shell: bash
         run: |
           rm -rf .pages-dist
           mkdir -p .pages-dist/icons
-          cp index.html styles.css app.mjs app-core.mjs manifest.webmanifest sw.js _headers .pages-dist/
+          cp index.html styles.css app.mjs app-core.mjs monetization.mjs monetization-core.mjs manifest.webmanifest sw.js _headers .pages-dist/
           cp icons/icon-192.png icons/icon-512.png .pages-dist/icons/
 
       - name: Deploy to Cloudflare Pages
@@ -181,6 +192,10 @@ jobs:
             "$base/api/trends" > "$RUNNER_TEMP/trends.json"
           jq -e '.source and (.trends | type == "array")' "$RUNNER_TEMP/trends.json" >/dev/null
           echo "Trend endpoint passed."
+
+          curl --fail --silent --show-error "$base/api/monetization-config" > "$RUNNER_TEMP/monetization.json"
+          jq -e '(.freeDailyLimit == 3) and (.offers.creator_monthly.amount == 5.99) and (.offers.pack_5.amount == 1.99)' "$RUNNER_TEMP/monetization.json" >/dev/null
+          echo "Monetization configuration endpoint passed."
 
           visual_status="$(curl --silent --show-error --max-time 45 \
             --output "$RUNNER_TEMP/visual.json" \
