@@ -345,11 +345,11 @@ function pickChaosObjectSpec() {
 }
 
 function spawnChaosObject(now) {
-  const mission = state.cookingMission;
-  const maxObjects = Number(mission?.maxObjects) || 15;
+  const mission = state.cookingMission || {};
+  const maxObjects = Number(mission.maxObjects) || 15;
   if (!chaosCanvas || state.cookingObjects.length >= maxObjects) return;
   const spec = pickChaosObjectSpec();
-  const speedScale = Number(mission?.speedScale) || 1;
+  const speedScale = Number(mission.speedScale) || 1;
   const radius = randomRange(34, 55);
   const edge = Math.floor(Math.random() * 4);
   let x = randomRange(radius, chaosCanvas.width - radius);
@@ -374,8 +374,8 @@ function spawnChaosObject(now) {
     wobble: randomRange(0, Math.PI * 2),
     color: CHAOS_COLORS[Math.floor(Math.random() * CHAOS_COLORS.length)],
   });
-  const spawnMin = Number(mission?.spawnMin) || 300;
-  const spawnMax = Number(mission?.spawnMax) || 620;
+  const spawnMin = Number(mission.spawnMin) || 300;
+  const spawnMax = Number(mission.spawnMax) || 620;
   state.cookingNextSpawnAt = now + randomRange(spawnMin, spawnMax);
 }
 
@@ -421,7 +421,8 @@ function handleChaosTap(event) {
   const [object] = state.cookingObjects.splice(hitIndex, 1);
   const now = performance.now();
   const previousMission = state.cookingMission;
-  const comboWindow = Number(previousMission?.comboWindow) || 1050;
+  const mission = previousMission || {};
+  const comboWindow = Number(mission.comboWindow) || 1050;
   const isPrecisionMiss = previousMission?.type === 'precision'
     && Array.isArray(previousMission.glyphs)
     && !previousMission.glyphs.includes(object.glyph);
@@ -522,7 +523,8 @@ function renderCookingChaos(now) {
   state.cookingProgressDisplay += (desired - state.cookingProgressDisplay) * Math.min(1, dt * 2.8);
 
   if (!state.cookingReady && now >= state.cookingNextSpawnAt) spawnChaosObject(now);
-  const comboWindow = Number(state.cookingMission?.comboWindow) || 1250;
+  const mission = state.cookingMission || {};
+  const comboWindow = Number(mission.comboWindow) || 1250;
   if (!state.cookingReady && now - state.cookingLastHitAt > comboWindow && state.cookingCombo > 1) {
     state.cookingCombo = Math.max(1, state.cookingCombo - 1);
   }
