@@ -489,10 +489,168 @@ export function syncedWordIndex(timings = [], seconds = 0, totalWords = 0, durat
 }
 
 const CHAOS_MISSIONS = Object.freeze([
-  Object.freeze({ type: 'collect', glyph: '🐸', target: 3, label: 'TAP 3 FROGS' }),
-  Object.freeze({ type: 'streak', target: 5, label: 'HIT 5 IN A ROW' }),
-  Object.freeze({ type: 'total', target: 10, label: 'POP 10 THINGS' }),
-  Object.freeze({ type: 'selective', glyphs: Object.freeze(['🐸', '🍌', '🐟']), target: 6, label: 'ONLY 🐸 🍌 🐟 · HIT 6' }),
+  Object.freeze({
+    gameId: 'target-hunt',
+    gameLabel: 'TARGET HUNT',
+    type: 'collect',
+    glyph: '🐸',
+    target: 4,
+    label: 'CATCH 4 🐸',
+    instruction: 'FROGS ONLY · DECOYS DO NOTHING',
+    spawnMin: 300,
+    spawnMax: 620,
+    maxObjects: 13,
+    comboWindow: 1050,
+    speedScale: 1,
+  }),
+  Object.freeze({
+    gameId: 'pop-rush',
+    gameLabel: 'POP RUSH',
+    type: 'total',
+    target: 12,
+    label: 'POP 12 ANYTHING',
+    instruction: 'CLEAR THE SCREEN AS FAST AS YOU CAN',
+    spawnMin: 170,
+    spawnMax: 360,
+    maxObjects: 18,
+    comboWindow: 900,
+    speedScale: 1.18,
+  }),
+  Object.freeze({
+    gameId: 'combo-rush',
+    gameLabel: 'COMBO RUSH',
+    type: 'combo',
+    target: 6,
+    label: 'BUILD A ×6 COMBO',
+    instruction: 'KEEP TAPPING · DON’T LET THE COMBO DROP',
+    spawnMin: 210,
+    spawnMax: 410,
+    maxObjects: 16,
+    comboWindow: 1300,
+    speedScale: 1.12,
+  }),
+  Object.freeze({
+    gameId: 'precision-lock',
+    gameLabel: 'PRECISION LOCK',
+    type: 'precision',
+    glyphs: Object.freeze(['👁️', '⚠️', '🌀']),
+    target: 6,
+    label: 'ONLY 👁️ ⚠️ 🌀 · HIT 6',
+    instruction: 'WRONG TARGET = LOSE 1 PROGRESS',
+    spawnMin: 380,
+    spawnMax: 690,
+    maxObjects: 10,
+    comboWindow: 1150,
+    speedScale: .9,
+  }),
+  Object.freeze({
+    gameId: 'score-sprint',
+    gameLabel: 'SCORE SPRINT',
+    type: 'score',
+    target: 320,
+    label: 'BANK 320 POINTS',
+    instruction: 'HIGH-VALUE CHAOS + COMBOS GET YOU THERE',
+    spawnMin: 230,
+    spawnMax: 440,
+    maxObjects: 15,
+    comboWindow: 1100,
+    speedScale: 1.08,
+  }),
+  Object.freeze({
+    gameId: 'target-hunt',
+    gameLabel: 'TARGET HUNT',
+    type: 'collect',
+    glyph: '🦆',
+    target: 5,
+    label: 'FIND 5 🦆',
+    instruction: 'DUCKS ONLY · IGNORE THE BAIT',
+    spawnMin: 290,
+    spawnMax: 570,
+    maxObjects: 13,
+    comboWindow: 1050,
+    speedScale: 1.02,
+  }),
+  Object.freeze({
+    gameId: 'pop-rush',
+    gameLabel: 'POP RUSH',
+    type: 'total',
+    target: 16,
+    label: 'POP 16 BEFORE IT COOKS',
+    instruction: 'NO THINKING · JUST DELETE CHAOS',
+    spawnMin: 150,
+    spawnMax: 330,
+    maxObjects: 20,
+    comboWindow: 850,
+    speedScale: 1.24,
+  }),
+  Object.freeze({
+    gameId: 'combo-rush',
+    gameLabel: 'COMBO RUSH',
+    type: 'combo',
+    target: 8,
+    label: 'BUILD A ×8 COMBO',
+    instruction: 'FAST HANDS · ONE LONG STREAK',
+    spawnMin: 190,
+    spawnMax: 380,
+    maxObjects: 17,
+    comboWindow: 1400,
+    speedScale: 1.16,
+  }),
+  Object.freeze({
+    gameId: 'precision-lock',
+    gameLabel: 'PRECISION LOCK',
+    type: 'precision',
+    glyphs: Object.freeze(['🍌', '🐟', '🧃']),
+    target: 7,
+    label: 'ONLY 🍌 🐟 🧃 · HIT 7',
+    instruction: 'WRONG TARGET KNOCKS YOU BACK',
+    spawnMin: 390,
+    spawnMax: 720,
+    maxObjects: 10,
+    comboWindow: 1200,
+    speedScale: .92,
+  }),
+  Object.freeze({
+    gameId: 'score-sprint',
+    gameLabel: 'SCORE SPRINT',
+    type: 'score',
+    target: 520,
+    label: 'BANK 520 POINTS',
+    instruction: 'CHAIN HITS FOR MULTIPLIERS',
+    spawnMin: 210,
+    spawnMax: 420,
+    maxObjects: 16,
+    comboWindow: 1150,
+    speedScale: 1.12,
+  }),
+  Object.freeze({
+    gameId: 'target-hunt',
+    gameLabel: 'TARGET HUNT',
+    type: 'collect',
+    glyph: '🧃',
+    target: 5,
+    label: 'GRAB 5 🧃',
+    instruction: 'JUICE ONLY · LET EVERYTHING ELSE FLOAT',
+    spawnMin: 280,
+    spawnMax: 550,
+    maxObjects: 12,
+    comboWindow: 1050,
+    speedScale: 1,
+  }),
+  Object.freeze({
+    gameId: 'selective-swarm',
+    gameLabel: 'SWARM FILTER',
+    type: 'selective',
+    glyphs: Object.freeze(['🐸', '🍌', '🐟']),
+    target: 9,
+    label: '🐸 🍌 🐟 ONLY · HIT 9',
+    instruction: 'THREE GOOD TARGETS · EVERYTHING ELSE IS BAIT',
+    spawnMin: 250,
+    spawnMax: 470,
+    maxObjects: 15,
+    comboWindow: 1050,
+    speedScale: 1.06,
+  }),
 ]);
 
 export function createChaosMission(index = 0) {
@@ -506,6 +664,29 @@ export function createChaosMission(index = 0) {
 }
 
 export function advanceChaosMission(mission, event = {}) {
+  if (!mission || mission.complete || event.hit !== true) return mission;
+  const next = { ...mission };
+  const glyph = String(event.glyph || '');
+
+  if (next.type === 'collect') {
+    if (glyph === next.glyph) next.progress += 1;
+  } else if (next.type === 'streak' || next.type === 'total') {
+    next.progress += 1;
+  } else if (next.type === 'selective') {
+    if (Array.isArray(next.glyphs) && next.glyphs.includes(glyph)) next.progress += 1;
+  } else if (next.type === 'precision') {
+    if (Array.isArray(next.glyphs) && next.glyphs.includes(glyph)) next.progress += 1;
+    else next.progress -= 1;
+  } else if (next.type === 'combo') {
+    next.progress = Math.max(next.progress, Number(event.combo) || 0);
+  } else if (next.type === 'score') {
+    next.progress = Math.max(next.progress, Number(event.score) || 0);
+  }
+
+  next.progress = Math.max(0, Math.min(next.target, next.progress));
+  next.complete = next.progress >= next.target;
+  return next;
+}) {
   if (!mission || mission.complete || event.hit !== true) return mission;
   const next = { ...mission };
   const glyph = String(event.glyph || '');
