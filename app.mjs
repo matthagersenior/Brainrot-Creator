@@ -2106,6 +2106,7 @@ function drawFrame(seconds) {
 
   const captionStillSpeaking = !state.audioBuffer || seconds <= state.narrationPlaybackSeconds + 0.35;
   if (captionStillSpeaking) drawCaption(words, localWordIndex);
+  window.BrainrotMonetization?.drawWatermark?.(ctx, canvas);
   ctx.restore();
 
 }
