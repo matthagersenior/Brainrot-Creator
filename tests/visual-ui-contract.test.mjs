@@ -290,3 +290,20 @@ test('image prompts follow exact narration beats and never borrow another scene 
   assert.doesNotMatch(app, /scheduled nearest-anchor reuse/);
   assert.doesNotMatch(app, /nearestImageIndex\(state\.sceneImages/);
 });
+
+
+test('loading game UI persists rotation and applies each mode rules instead of restarting Tap Everything', async () => {
+  const app = await readFile(new URL('app.mjs', root), 'utf8');
+  const html = await readFile(new URL('index.html', root), 'utf8');
+
+  assert.match(app, /brainrot\.loading-game-index/);
+  assert.match(app, /mission\.gameLabel/);
+  assert.match(app, /mission\.instruction/);
+  assert.match(app, /mission\.spawnMin/);
+  assert.match(app, /mission\.maxObjects/);
+  assert.match(app, /mission\.comboWindow/);
+  assert.match(app, /mission\.speedScale/);
+  assert.match(app, /advanceChaosMission\(previousMission, \{[^}]*combo:[^}]*score:/s);
+  assert.match(html, /id="chaosGameShell"/);
+  assert.match(html, /id="chaosTip"/);
+});
