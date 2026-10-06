@@ -494,8 +494,8 @@ const CHAOS_MISSIONS = Object.freeze([
     gameLabel: 'TARGET HUNT',
     type: 'collect',
     glyph: '🐸',
-    target: 4,
-    label: 'CATCH 4 🐸',
+    target: 3,
+    label: 'CATCH 3 🐸',
     instruction: 'FROGS ONLY · DECOYS DO NOTHING',
     spawnMin: 300,
     spawnMax: 620,
@@ -681,22 +681,6 @@ export function advanceChaosMission(mission, event = {}) {
     next.progress = Math.max(next.progress, Number(event.combo) || 0);
   } else if (next.type === 'score') {
     next.progress = Math.max(next.progress, Number(event.score) || 0);
-  }
-
-  next.progress = Math.max(0, Math.min(next.target, next.progress));
-  next.complete = next.progress >= next.target;
-  return next;
-}) {
-  if (!mission || mission.complete || event.hit !== true) return mission;
-  const next = { ...mission };
-  const glyph = String(event.glyph || '');
-
-  if (next.type === 'collect') {
-    if (glyph === next.glyph) next.progress += 1;
-  } else if (next.type === 'streak' || next.type === 'total') {
-    next.progress += 1;
-  } else if (next.type === 'selective') {
-    if (Array.isArray(next.glyphs) && next.glyphs.includes(glyph)) next.progress += 1;
   }
 
   next.progress = Math.max(0, Math.min(next.target, next.progress));
