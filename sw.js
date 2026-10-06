@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rot-machine-shell-v12';
+const CACHE_NAME = 'rot-machine-shell-v13';
 const SCOPE_URL = new URL('./', self.location.href);
 const APP_SHELL = [
   './',
@@ -6,6 +6,8 @@ const APP_SHELL = [
   './styles.css',
   './app.mjs',
   './app-core.mjs',
+  './monetization.mjs',
+  './monetization-core.mjs',
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',
