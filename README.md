@@ -116,6 +116,6 @@ Brainrot Creator is prepared for the existing Google AdSense publisher account `
 - `<meta name="google-adsense-account" content="ca-pub-6958734306376288">` in the public page `<head>`.
 - Root-level `/ads.txt` declaring `google.com, pub-6958734306376288, DIRECT, f08c47fec0942fa0`.
 
-**Publisher action required:** In [AdSense Sites](https://www.google.com/adsense/new/u/0/pub-6958734306376288/sites), add `brainrot-creator.pages.dev`, choose the **meta tag** verification method, verify, and request review. Google reviews each site separately; these files do **not** imply account access, review submission, approval, or ad serving.
+**Publisher action required:** In [AdSense Sites](https://www.google.com/adsense/), add `brainrot-creator.pages.dev`, choose the **meta tag** verification method, verify, and request review. Google reviews each site separately; these files do **not** imply account access, review submission, approval, or ad serving.
 
 No advertising script or ad placement is activated by this change. The site's current security policy blocks third-party scripts, and Google's [AdSense CSP guidance](https://support.google.com/adsense/answer/16283098) should be followed before launching ads. Plan ad placements on content-bearing pages away from the prompt controls, Chaos Tap canvas and result controls, and confirm privacy/consent notices before turning on ads. A single-page generator UI may require additional substantive, crawlable content to pass site review.
