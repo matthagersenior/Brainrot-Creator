@@ -108,3 +108,14 @@ Narration playback stays close to the generated voice's natural cadence. Mild ti
 ## Safety / parody behavior
 
 Trend suggestions are conservatively filtered. Story prompting keeps real-person references fictional and non-defamatory, avoids tragedy jokes and slurs, and never imitates a real person's voice. Generated visual prompts prohibit text/logos/watermarks inside generated frames and preserve continuity rather than requesting real-person likeness replication.
+
+## Google AdSense site verification
+
+Brainrot Creator is prepared for the existing Google AdSense publisher account `ca-pub-6958734306376288` with:
+
+- `<meta name="google-adsense-account" content="ca-pub-6958734306376288">` in the public page `<head>`.
+- Root-level `/ads.txt` declaring `google.com, pub-6958734306376288, DIRECT, f08c47fec0942fa0`.
+
+**Publisher action required:** In [AdSense Sites](https://www.google.com/adsense/new/u/0/pub-6958734306376288/sites), add `brainrot-creator.pages.dev`, choose the **meta tag** verification method, verify, and request review. Google reviews each site separately; these files do **not** imply account access, review submission, approval, or ad serving.
+
+No advertising script or ad placement is activated by this change. The site's current security policy blocks third-party scripts, and Google's [AdSense CSP guidance](https://support.google.com/adsense/answer/16283098) should be followed before launching ads. Plan ad placements on content-bearing pages away from the prompt controls, Chaos Tap canvas and result controls, and confirm privacy/consent notices before turning on ads. A single-page generator UI may require additional substantive, crawlable content to pass site review.
