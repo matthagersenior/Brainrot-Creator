@@ -45,5 +45,5 @@ test('index has no escaped script delimiter and new app shell cache refreshes pu
   const [html, sw] = await Promise.all([source('index.html'), source('sw.js')]);
   assert.doesNotMatch(html, /<\/script>\\n\s*<script/);
   assert.match(html, /<script type="module" src="\.\/monetization\.mjs"><\/script>\n\s*<script type="module" src="\.\/app\.mjs">/);
-  assert.match(sw, /rot-machine-shell-v15/);
+  assert.match(sw, /rot-machine-shell-v16/);
 });

@@ -133,7 +133,7 @@ jobs:
         run: |
           rm -rf .pages-dist
           mkdir -p .pages-dist/icons
-          cp index.html styles.css app.mjs app-core.mjs monetization.mjs monetization-core.mjs manifest.webmanifest sw.js _headers .pages-dist/
+          cp index.html styles.css app.mjs app-core.mjs monetization.mjs monetization-core.mjs manifest.webmanifest sw.js ads.txt _headers .pages-dist/
           cp icons/icon-192.png icons/icon-512.png .pages-dist/icons/
 
       - name: Deploy to Cloudflare Pages
@@ -176,6 +176,16 @@ jobs:
             exit 1
           fi
           echo "Live page passed."
+
+          curl --fail --silent --show-error "$base/ads.txt" > "$RUNNER_TEMP/ads.txt"
+          grep -Fxq 'google.com, pub-6958734306376288, DIRECT, f08c47fec0942fa0' "$RUNNER_TEMP/ads.txt"
+          curl --fail --silent --show-error --dump-header "$RUNNER_TEMP/headers.txt" \
+            "$base/" -o "$RUNNER_TEMP/ads-page.html"
+          grep -qi "script-src 'nonce-" "$RUNNER_TEMP/headers.txt"
+          grep -qi "'strict-dynamic'" "$RUNNER_TEMP/headers.txt"
+          grep -q 'adsbygoogle.js?client=ca-pub-6958734306376288' "$RUNNER_TEMP/ads-page.html"
+          grep -Eq '<script nonce="[A-Za-z0-9+/=]+" async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js' "$RUNNER_TEMP/ads-page.html"
+          echo "AdSense integration, live ads.txt, and per-response nonce CSP passed (approval still required)."
 
           curl --fail --silent --show-error "$base/app.mjs" > "$RUNNER_TEMP/app.mjs"
           grep -q 'txt2vid' "$RUNNER_TEMP/app.mjs"
