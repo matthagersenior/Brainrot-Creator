@@ -248,7 +248,7 @@ jobs:
             jq -e '(.source | startswith("gemini-")) and (.visualStyle == "cursed-real") and (.scenes | length == 8) and ([.scenes[].visualBeats | length == 2] | all)' "$RUNNER_TEMP/story.json" >/dev/null
             echo "Gemini story endpoint passed."
           elif [[ "$story_status" == "502" ]] \
-            && jq -e '(.detail // "") | test("high demand|UNAVAILABLE|RESOURCE_EXHAUSTED|rate limit|temporar"; "i")' "$RUNNER_TEMP/story.json" >/dev/null; then
+            && jq -e '(.detail // "") | test("high demand|UNAVAILABLE|RESOURCE_EXHAUSTED|rate limit|temporar|timeout|exceeded 30s"; "i")' "$RUNNER_TEMP/story.json" >/dev/null; then
             echo "::warning::Gemini story provider is temporarily unavailable; local story fallback keeps production usable."
           else
             echo "Story endpoint failed unexpectedly with HTTP $story_status:"
